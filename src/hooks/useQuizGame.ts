@@ -416,7 +416,7 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
 
   // ── Effects ────────────────────────────────────────────────────────────
 
-  // Auto-advance: after answer reveal, wait 3 s then transition to leaderboard
+  // Auto-advance: after answer reveal, wait 2 s then transition to leaderboard
   useEffect(() => {
     if (gameState !== 'QUESTION' || !isAnswerRevealed) return;
 
@@ -426,7 +426,7 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
         setSession(prev => (prev ? { ...prev, players: simulateMockAnswers(prev) } : null));
       }
       setGameState('LEADERBOARD');
-    }, 3000);
+    }, 2000);
 
     return () => clearTimeout(timeout);
   }, [gameState, isAnswerRevealed, useMockMode, simulateMockAnswers]);
