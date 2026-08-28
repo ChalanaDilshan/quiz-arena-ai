@@ -71,17 +71,26 @@ export function GameOverView({ players, playerId, session, isHost, onRestart }: 
     frame();
   }, []);
 
-  // ── CSV Export Function ───────────────────────────────────────────────────
+  // ── CSV Export Function with Formula Injection Sanitization (CWE-1236) ─────
   const exportCsvReport = () => {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const filename = `QuizArena_Report_PIN-${roomPin}_${timestamp}.csv`;
+
+    const sanitizeCell = (text: string | number) => {
+      let str = String(text).replace(/"/g, '""');
+      // Defend against formula injection in Excel/Sheets (=, +, -, @, \t, \r)
+      if (/^[=+\-@\t\r]/.test(str)) {
+        str = `'${str}`;
+      }
+      return `"${str}"`;
+    };
 
     let csvContent = 'data:text/csv;charset=utf-8,';
     csvContent += '====================================================\n';
     csvContent += 'QUIZ ARENA — PERFORMANCE & ATTENDANCE REPORT\n';
     csvContent += '====================================================\n';
-    csvContent += `Generated At,${new Date().toLocaleString()}\n`;
-    csvContent += `Room PIN,${roomPin}\n`;
+    csvContent += `Generated At,${sanitizeCell(new Date().toLocaleString())}\n`;
+    csvContent += `Room PIN,${sanitizeCell(roomPin)}\n`;
     csvContent += `Total Participants,${sorted.length}\n`;
     csvContent += `Total Questions,${totalQuestions}\n`;
     csvContent += `Average Score,${avgScore} pts\n`;
@@ -90,10 +99,10 @@ export function GameOverView({ players, playerId, session, isHost, onRestart }: 
     csvContent += '----------------------------------------------------\n';
     csvContent += 'HARDEST QUESTION SUMMARY\n';
     csvContent += '----------------------------------------------------\n';
-    csvContent += `Question,"${hardestQuestion.text.replace(/"/g, '""')}"\n`;
-    csvContent += `Correct Answer,"${hardestQuestion.options[hardestQuestion.correctIndex].replace(/"/g, '""')}"\n`;
+    csvContent += `Question,${sanitizeCell(hardestQuestion.text)}\n`;
+    csvContent += `Correct Answer,${sanitizeCell(hardestQuestion.options[hardestQuestion.correctIndex])}\n`;
     csvContent += `Class Accuracy,${hardestAccuracy}%\n`;
-    csvContent += `Concept Explanation,"${(hardestQuestion.explanation || '').replace(/"/g, '""')}"\n\n`;
+    csvContent += `Concept Explanation,${sanitizeCell(hardestQuestion.explanation || '')}\n\n`;
 
     csvContent += '----------------------------------------------------\n';
     csvContent += 'PARTICIPANT ATTENDANCE & SCORE ROSTER\n';
@@ -103,7 +112,7 @@ export function GameOverView({ players, playerId, session, isHost, onRestart }: 
     sorted.forEach((player, idx) => {
       const correct = player.correctCount ?? Math.min(totalQuestions, Math.round(player.score / 1200));
       const accuracy = totalQuestions > 0 ? Math.round((correct / totalQuestions) * 100) : 0;
-      csvContent += `${idx + 1},"${player.nickname.replace(/"/g, '""')}",${player.score},${correct},${totalQuestions},${accuracy}%,${player.streak},${player.isHost ? 'Host' : 'Player'}\n`;
+      csvContent += `${idx + 1},${sanitizeCell(player.nickname)},${player.score},${correct},${totalQuestions},${accuracy}%,${player.streak},${player.isHost ? 'Host' : 'Player'}\n`;
     });
 
     const encodedUri = encodeURI(csvContent);

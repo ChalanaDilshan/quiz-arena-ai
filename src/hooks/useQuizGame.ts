@@ -265,14 +265,21 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
 
       // ── Live WebSocket join ──
       try {
-        const ws = new WebSocket(
-          `${import.meta.env.VITE_WS_URL ?? ''}?pin=${pin}&nickname=${nickname}`,
-        );
+        const wsUrl = `${import.meta.env.VITE_WS_URL ?? ''}?pin=${encodeURIComponent(pin)}&nickname=${encodeURIComponent(nickname)}`;
+        const ws = new WebSocket(wsUrl);
         wsRef.current = ws;
         ws.onopen = () =>
           ws.send(JSON.stringify({ action: 'joinRoom', payload: { pin, nickname, playerId } }));
-        ws.onmessage = e => handleWsMessage(JSON.parse(e.data));
+        ws.onmessage = e => {
+          try {
+            const data = JSON.parse(e.data);
+            handleWsMessage(data);
+          } catch (err) {
+            console.error('Failed to parse incoming WebSocket message:', err);
+          }
+        };
         ws.onerror = () => setError('Connection failed. Please try again.');
+        ws.onclose = () => console.info('WebSocket connection closed.');
       } catch {
         setError('Could not connect to game server.');
       }
