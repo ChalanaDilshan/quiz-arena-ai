@@ -16,9 +16,17 @@ export interface QuizRecord {
   totalPlayers: number;
 }
 
+export interface SavedQuiz {
+  id: string;
+  topic: string;
+  dateSaved: string;
+  questions: Question[];
+}
+
 // ─── Storage key ──────────────────────────────────────────────────────────────
 
 const storageKey = (uid: string) => `qa_history_${uid}`;
+const savedQuizzesKey = (uid: string) => `qa_saved_${uid}`;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -56,6 +64,33 @@ export function deleteQuizRecord(uid: string, id: string): void {
     localStorage.setItem(storageKey(uid), JSON.stringify(updated));
   } catch (err) {
     console.error('Failed to delete quiz record:', err);
+  }
+}
+
+// ─── Saved Quizzes ────────────────────────────────────────────────────────────
+
+export function getSavedQuizzes(uid: string): SavedQuiz[] {
+  try {
+    const raw = localStorage.getItem(savedQuizzesKey(uid));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as SavedQuiz[];
+    return parsed.sort(
+      (a, b) => new Date(b.dateSaved).getTime() - new Date(a.dateSaved).getTime(),
+    );
+  } catch {
+    return [];
+  }
+}
+
+export function saveQuiz(uid: string, quiz: SavedQuiz): void {
+  try {
+    const existing = getSavedQuizzes(uid).filter((q) => q.id !== quiz.id);
+    localStorage.setItem(
+      savedQuizzesKey(uid),
+      JSON.stringify([quiz, ...existing]),
+    );
+  } catch (err) {
+    console.error('Failed to save quiz:', err);
   }
 }
 

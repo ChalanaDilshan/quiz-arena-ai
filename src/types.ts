@@ -25,6 +25,7 @@ export interface Player {
   lastScoreDelta?: number; // Points earned on the most recent question
   correctCount?: number;   // Total correct answers for analytics report
   answersGiven?: number;   // Total questions answered
+  wrongStreak?: number;    // Consecutive wrong answers
 }
 
 /** Full quiz session state */

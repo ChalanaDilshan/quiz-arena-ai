@@ -1,10 +1,11 @@
-import { useState, useRef, type DragEvent, type ChangeEvent } from 'react';
+import { useState, useRef, useEffect, type DragEvent, type ChangeEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Upload, Users, Zap, FileText, ArrowRight,
-  Sparkles, ChevronLeft, ChevronUp, ChevronDown, LogIn, LayoutDashboard,
+  Sparkles, ChevronLeft, ChevronUp, ChevronDown, LogIn, LayoutDashboard, BookOpen,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { getSavedQuizzes, type SavedQuiz } from '../utils/quizHistory';
 
 interface HomeViewProps {
   onJoinGame: (pin: string, nickname: string) => void;
@@ -13,6 +14,7 @@ interface HomeViewProps {
   error: string | null;
   initialTab?: 'join' | 'host';
   initialPin?: string;
+  onHostSavedQuiz?: (quiz: SavedQuiz) => void;
 }
 
 type Difficulty = 'Easy' | 'Medium' | 'Hard';
@@ -25,7 +27,7 @@ const DIFFICULTY_META: Record<Difficulty, { desc: string }> = {
 
 const MIN_Q = 3, MAX_Q = 20;
 
-export function HomeView({ onJoinGame, onHostGame, uploadProgress, error, initialTab = 'join', initialPin }: HomeViewProps) {
+export function HomeView({ onJoinGame, onHostGame, onHostSavedQuiz, uploadProgress, error, initialTab = 'join', initialPin }: HomeViewProps) {
   const [activeTab, setActiveTab] = useState<'join' | 'host'>(initialTab);
   const [pin, setPin] = useState<string[]>(() => {
     if (initialPin && initialPin.length === 6) {
@@ -42,6 +44,16 @@ export function HomeView({ onJoinGame, onHostGame, uploadProgress, error, initia
   const pinRefs = useRef<(HTMLInputElement | null)[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const { user, signInWithGoogle } = useAuth();
+  
+  const [savedQuizzes, setSavedQuizzes] = useState<SavedQuiz[]>([]);
+  
+  useEffect(() => {
+    if (user) {
+      setSavedQuizzes(getSavedQuizzes(user.uid));
+    } else {
+      setSavedQuizzes([]);
+    }
+  }, [user]);
 
   const handlePinChange = (i: number, v: string) => {
     if (!/^\d*$/.test(v)) return;
@@ -238,6 +250,33 @@ export function HomeView({ onJoinGame, onHostGame, uploadProgress, error, initia
                   <button onClick={() => selectedFile && setHostStep('config')} disabled={!selectedFile} className="btn-primary w-full">
                     Continue <ArrowRight className="w-4 h-4" />
                   </button>
+
+                  {/* Saved Quizzes Section */}
+                  {savedQuizzes.length > 0 && (
+                    <div className="mt-6 pt-6 border-t border-rim">
+                      <p className="text-[10px] uppercase tracking-widest font-semibold text-smoke mb-3">Or host a saved quiz</p>
+                      <div className="space-y-2">
+                        {savedQuizzes.map(quiz => (
+                          <div 
+                            key={quiz.id} 
+                            className="flex items-center justify-between p-3 rounded-xl border border-rim hover:border-sienna transition-colors bg-canvas cursor-pointer" 
+                            onClick={() => onHostSavedQuiz?.(quiz)}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-lg bg-sienna/10 flex items-center justify-center">
+                                <BookOpen className="w-4 h-4 text-sienna" />
+                              </div>
+                              <div className="text-left">
+                                <p className="text-xs font-bold text-alabaster">{quiz.topic}</p>
+                                <p className="text-[10px] text-smoke">{quiz.questions.length} questions</p>
+                              </div>
+                            </div>
+                            <button className="btn-ghost !px-2 !py-1 text-xs text-sienna hover:bg-sienna/10">Host</button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </motion.div>
 
               ) : (

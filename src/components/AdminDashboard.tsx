@@ -1,17 +1,17 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Zap, ArrowLeft, LogOut, BarChart3, Users, Trophy,
   Target, Trash2, ChevronRight, Calendar, BookOpen,
   TrendingUp, AlertTriangle, CheckCircle2, Download,
-  FileSpreadsheet, X, Award,
+  FileSpreadsheet, X, Award, Bot,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import {
-  getQuizHistory, deleteQuizRecord,
+  getQuizHistory, deleteQuizRecord, saveQuiz,
   type QuizRecord,
 } from '../utils/quizHistory';
-import type { Player } from '../types';
+import type { Player, Question } from '../types';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -357,6 +357,62 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
     user ? getQuizHistory(user.uid) : [],
   );
 
+  const [pendingQuiz, setPendingQuiz] = useState<Question[] | null>(null);
+  const [isApproving, setIsApproving] = useState(false);
+  const [isTriggering, setIsTriggering] = useState(false);
+
+  useEffect(() => {
+    fetch('http://localhost:3001/api/agent/pending')
+      .then(res => res.json())
+      .then(data => {
+        if (data.pendingQuiz) setPendingQuiz(data.pendingQuiz);
+      })
+      .catch(console.error);
+  }, []);
+
+  const handleApproveQuiz = () => {
+    if (!user || !pendingQuiz) return;
+    setIsApproving(true);
+    
+    saveQuiz(user.uid, {
+      id: `syllabus_${Date.now()}`,
+      topic: 'CS 101: React Hooks Fundamentals',
+      dateSaved: new Date().toISOString(),
+      questions: pendingQuiz,
+    });
+
+    fetch('http://localhost:3001/api/agent/clear', { method: 'POST' })
+      .then(() => setPendingQuiz(null))
+      .catch(console.error)
+      .finally(() => setIsApproving(false));
+  };
+
+  const handleDismissQuiz = () => {
+    fetch('http://localhost:3001/api/agent/clear', { method: 'POST' })
+      .then(() => setPendingQuiz(null))
+      .catch(console.error);
+  };
+
+  const simulateBackgroundAgent = () => {
+    setIsTriggering(true);
+    fetch('http://localhost:3001/api/agent/trigger', { method: 'POST' })
+      .then(() => {
+        // Poll for the result after a few seconds
+        const interval = setInterval(() => {
+          fetch('http://localhost:3001/api/agent/pending')
+            .then(res => res.json())
+            .then(data => {
+              if (data.pendingQuiz) {
+                setPendingQuiz(data.pendingQuiz);
+                setIsTriggering(false);
+                clearInterval(interval);
+              }
+            });
+        }, 2000);
+      })
+      .catch(() => setIsTriggering(false));
+  };
+
   const refreshRecords = () => {
     if (user) setRecords(getQuizHistory(user.uid));
   };
@@ -427,6 +483,16 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
                 {user?.email}
               </p>
             </div>
+            
+            <button
+              onClick={simulateBackgroundAgent}
+              disabled={isTriggering}
+              className="btn-primary !py-1.5 !px-3 text-xs flex items-center gap-1.5 hidden sm:flex"
+            >
+              <Zap className="w-3.5 h-3.5" />
+              {isTriggering ? 'Agent Running...' : 'Simulate Agent'}
+            </button>
+
             <button
               onClick={signOut}
               className="btn-ghost !py-1.5 !px-3 text-xs flex items-center gap-1.5 text-smoke hover:text-red-400 transition-colors"
@@ -465,6 +531,50 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
                   All quizzes you've hosted, with full student performance analytics.
                 </p>
               </div>
+
+              {/* AI Agent Notification Card */}
+              <AnimatePresence>
+                {pendingQuiz && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -20, height: 0 }}
+                    animate={{ opacity: 1, y: 0, height: 'auto' }}
+                    exit={{ opacity: 0, y: -20, height: 0 }}
+                    className="mb-8 overflow-hidden"
+                  >
+                    <div className="card rounded-2xl p-5 border-2 border-indigo-500/30 bg-indigo-500/5 shadow-[0_0_30px_rgba(99,102,241,0.1)]">
+                      <div className="flex items-start gap-4">
+                        <div className="w-10 h-10 rounded-full bg-indigo-500/20 flex items-center justify-center flex-shrink-0 mt-1">
+                          <Bot className="w-5 h-5 text-indigo-400" />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="text-sm font-bold text-indigo-300 flex items-center gap-2 mb-1">
+                            🤖 AI Agent Notification
+                          </h3>
+                          <p className="text-sm text-alabaster mb-4">
+                            I scanned your CS 101 syllabus. You are teaching <strong>React Hooks Fundamentals</strong> next week. I autonomously generated a 5-question Quiz Arena match for it. Would you like to review and publish it to your class?
+                          </p>
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={handleApproveQuiz}
+                              disabled={isApproving}
+                              className="btn-primary text-xs !py-2 !px-4 flex items-center gap-2"
+                            >
+                              <CheckCircle2 className="w-4 h-4" />
+                              {isApproving ? 'Saving...' : 'Review & Publish'}
+                            </button>
+                            <button
+                              onClick={handleDismissQuiz}
+                              className="btn-ghost text-xs !py-2 !px-4 text-smoke hover:text-alabaster"
+                            >
+                              Dismiss
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {/* Summary Stats */}
               {records.length > 0 && (

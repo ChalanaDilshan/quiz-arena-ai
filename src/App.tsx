@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Sun, Moon } from 'lucide-react';
 import { useTheme } from './context/ThemeContext';
@@ -10,6 +10,8 @@ import { QuestionView } from './components/QuestionView';
 import { LeaderboardView } from './components/LeaderboardView';
 import { GameOverView } from './components/GameOverView';
 import { AdminDashboard } from './components/AdminDashboard';
+import { useCommentator } from './hooks/useCommentator';
+import { CommentatorWidget } from './components/CommentatorWidget';
 
 /** Smooth page-to-page transition */
 const pageVariants = {
@@ -58,6 +60,32 @@ function App() {
   const [hostFileName, setHostFileName] = useState('');
 
   const game = useQuizGame(true); // true = mock mode; set false + VITE_WS_URL for live
+  const commentator = useCommentator();
+
+  // ── AI Commentator Triggers (Less Distracting) ────────────────────────────
+  useEffect(() => {
+    if (game.gameState === 'LEADERBOARD') {
+      const players = game.players.filter(p => !p.isHost);
+      
+      // Look for a player on a hot streak (>= 2 correct)
+      const hotPlayer = players.find(p => p.streak >= 2);
+      // Look for a player on a cold streak (>= 2 wrong)
+      const coldPlayer = players.find(p => (p.wrongStreak ?? 0) >= 2);
+
+      if (hotPlayer) {
+        commentator.triggerCommentary('HOT_STREAK', {
+          nickname: hotPlayer.nickname,
+          streak: hotPlayer.streak,
+        });
+      } else if (coldPlayer) {
+        commentator.triggerCommentary('COLD_STREAK', {
+          nickname: coldPlayer.nickname,
+          wrongStreak: coldPlayer.wrongStreak,
+        });
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game.gameState]);
 
   const goToGame = (tab: 'join' | 'host') => {
     setInitialTab(tab);
@@ -75,6 +103,10 @@ function App() {
             onHostGame={(file, numQ, diff) => {
               setHostFileName(file.name);
               game.hostGame(file, numQ, diff);
+            }}
+            onHostSavedQuiz={(quiz) => {
+              setHostFileName(quiz.topic);
+              game.hostSavedQuiz(quiz);
             }}
             uploadProgress={game.uploadProgress}
             error={game.error}
@@ -147,6 +179,11 @@ function App() {
           <motion.div key={game.gameState} variants={pageVariants} initial="initial" animate="animate" exit="exit" transition={{ duration: 0.25 }}>
             <FloatingThemeToggle />
             {renderGameView()}
+            <CommentatorWidget 
+              comment={commentator.currentComment} 
+              isVisible={commentator.isVisible} 
+              isTyping={commentator.isTyping} 
+            />
           </motion.div>
         )}
       </AnimatePresence>

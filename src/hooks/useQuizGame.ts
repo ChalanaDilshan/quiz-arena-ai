@@ -84,6 +84,7 @@ export interface UseQuizGameReturn {
   // Actions
   joinGame: (pin: string, nickname: string) => void;
   hostGame: (file: File, numQuestions: number, difficulty: string) => void;
+  hostSavedQuiz: (quiz: { topic: string; questions: Question[] }) => void;
   startGame: () => void;
   submitAnswer: (answerIndex: number) => void;
   nextQuestion: () => void;
@@ -182,6 +183,7 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
           lastScoreDelta: delta,
           correctCount: (p.correctCount ?? 0) + (correct ? 1 : 0),
           answersGiven: (p.answersGiven ?? 0) + 1,
+          wrongStreak: correct ? 0 : (p.wrongStreak ?? 0) + 1,
         };
       });
     },
@@ -340,6 +342,32 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
     [useMockMode, playerId, buildMockPlayers],
   );
 
+  const hostSavedQuiz = useCallback(
+    (quiz: { topic: string; questions: Question[] }) => {
+      setError(null);
+      const pin = generatePin();
+      const host: Player = {
+        id: playerId,
+        nickname: 'Host',
+        score: 0,
+        streak: 0,
+        avatarColor: AVATAR_COLORS[0],
+        isHost: true,
+      };
+      setSession({
+        roomPin: pin,
+        questions: quiz.questions,
+        players: [host, ...buildMockPlayers()],
+        currentQuestionIndex: 0,
+        gameState: 'LOBBY',
+        hostId: playerId,
+      });
+      setIsHost(true);
+      setGameState('LOBBY');
+    },
+    [playerId, buildMockPlayers],
+  );
+
   const startGame = useCallback(() => {
     if (!session) return;
     setSession(prev => (prev ? { ...prev, gameState: 'QUESTION', currentQuestionIndex: 0 } : null));
@@ -372,6 +400,7 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
               lastScoreDelta: delta,
               correctCount: (p.correctCount ?? 0) + (correct ? 1 : 0),
               answersGiven: (p.answersGiven ?? 0) + 1,
+              wrongStreak: correct ? 0 : (p.wrongStreak ?? 0) + 1,
             };
           }),
         };
@@ -455,6 +484,7 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
     error,
     joinGame,
     hostGame,
+    hostSavedQuiz,
     startGame,
     submitAnswer,
     nextQuestion,
