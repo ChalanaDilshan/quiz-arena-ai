@@ -11,25 +11,25 @@
 
 ---
 
-## 🌟 Key Features
+## Key Features
 
-- 🧠 **AI-Powered Question Generation:** Upload lecture notes, study guides, or research papers as PDF documents to automatically extract core concepts and construct 4-choice questions with verified distractors.
-- 📱 **QR Code One-Tap Mobile Join:** Display a live SVG QR Code or enlarged projector modal in the lobby. Players scan with their phone camera to instantly enter the room with the PIN pre-filled.
-- 🎮 **Interactive Hero Demo:** Test answering sample questions with dynamic score calculation, speed multipliers, and real-time leaderboard re-ranking right from the landing page.
-- 🏆 **Live Real-Time Leaderboards:** Synchronized gameplay with spring layout animations, streak multipliers (up to $2\times$), and round-by-round score deltas.
-- 📊 **Teacher / Host Summary Reports:**
-  - ⚠️ **Hardest Question Spotlight:** Highlights concepts with the lowest accuracy rate and explanations.
-  - 📈 **Classroom Analytics:** Average score, overall room accuracy %, and total attendance.
-  - 📥 **One-Click CSV Export:** Generates structured `.csv` reports for Excel, Google Sheets, or LMS.
-  - 📄 **Printable Match Report Modal:** Formatted print view with executive tables and `window.print()` trigger.
-- 🌓 **Tactile Modern Dark & Light Themes:**
+- **AI-Powered Question Generation:** Upload lecture notes, study guides, or research papers as PDF documents to automatically extract core concepts and construct 4-choice questions with verified distractors.
+- **QR Code One-Tap Mobile Join:** Display a live SVG QR Code or enlarged projector modal in the lobby. Players scan with their phone camera to instantly enter the room with the PIN pre-filled.
+- **Interactive Hero Demo:** Test answering sample questions with dynamic score calculation, speed multipliers, and real-time leaderboard re-ranking right from the landing page.
+- **Live Real-Time Leaderboards:** Synchronized gameplay with spring layout animations, streak multipliers (up to $2\times$), and round-by-round score deltas.
+- **Teacher / Host Summary Reports:**
+  - **Hardest Question Spotlight:** Highlights concepts with the lowest accuracy rate and explanations.
+  - **Classroom Analytics:** Average score, overall room accuracy %, and total attendance.
+  - **One-Click CSV Export:** Generates structured `.csv` reports for Excel, Google Sheets, or LMS.
+  - **Printable Match Report Modal:** Formatted print view with executive tables and `window.print()` trigger.
+- **Tactile Modern Dark & Light Themes:**
   - **Obsidian Dark Mode:** `#0C0D0E` canvas, `#141618` elevated surfaces, `#23272C` crisp borders, and `#E07A5F` terracotta accents.
   - **Warm Linen Light Mode:** `#F8F6F0` canvas and `#FFFFFF` crisp cards.
   - Persistent theme switching via `localStorage`.
 
 ---
 
-## 🏗️ Project Architecture
+## Project Architecture
 
 ```
 d:/aws project/
@@ -58,7 +58,7 @@ d:/aws project/
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### 1. Prerequisites
 - **Node.js** 18+ installed on your machine.
@@ -95,7 +95,7 @@ npm run preview
 
 ---
 
-## ⚙️ Configuration (Mock vs AWS Live Mode)
+## Configuration (Mock vs AWS Live Mode)
 
 Quiz Arena includes a built-in **Mock Mode** enabling complete standalone testing without backend dependencies.
 
@@ -112,7 +112,7 @@ To connect to a live AWS API Gateway WebSocket backend:
 
 ---
 
-## 👨‍💻 Author
+## Author
 
 **Created by Chalana Dilshan**
 
