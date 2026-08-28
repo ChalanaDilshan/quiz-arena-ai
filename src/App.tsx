@@ -9,6 +9,7 @@ import { LobbyView } from './components/LobbyView';
 import { QuestionView } from './components/QuestionView';
 import { LeaderboardView } from './components/LeaderboardView';
 import { GameOverView } from './components/GameOverView';
+import { AdminDashboard } from './components/AdminDashboard';
 
 /** Smooth page-to-page transition */
 const pageVariants = {
@@ -49,8 +50,12 @@ function App() {
 
   // Controls whether we show the marketing landing page (skip if scanning QR with ?pin=...)
   const [showLanding, setShowLanding] = useState<boolean>(() => !initialPin);
+  // Controls whether admin dashboard is shown
+  const [showAdmin, setShowAdmin] = useState(false);
   // Tab to pre-select on HomeView ('join' or 'host')
   const [initialTab, setInitialTab] = useState<'join' | 'host'>(initialPin ? 'join' : 'join');
+  // Track the PDF filename used for the current hosted quiz (for history)
+  const [hostFileName, setHostFileName] = useState('');
 
   const game = useQuizGame(true); // true = mock mode; set false + VITE_WS_URL for live
 
@@ -67,7 +72,10 @@ function App() {
             initialTab={initialTab}
             initialPin={initialPin}
             onJoinGame={game.joinGame}
-            onHostGame={game.hostGame}
+            onHostGame={(file, numQ, diff) => {
+              setHostFileName(file.name);
+              game.hostGame(file, numQ, diff);
+            }}
             uploadProgress={game.uploadProgress}
             error={game.error}
           />
@@ -112,18 +120,28 @@ function App() {
             playerId={game.playerId}
             session={game.session}
             isHost={game.isHost}
+            hostFileName={hostFileName}
             onRestart={() => { game.resetGame(); setShowLanding(true); }}
           />
         );
     }
   };
 
+  // Show admin dashboard
+  if (showAdmin) {
+    return <AdminDashboard onBack={() => setShowAdmin(false)} />;
+  }
+
   return (
     <div className="min-h-screen bg-canvas">
       <AnimatePresence mode="wait">
         {showLanding ? (
           <motion.div key="landing" variants={pageVariants} initial="initial" animate="animate" exit="exit" transition={{ duration: 0.3 }}>
-            <LandingPage onHost={() => goToGame('host')} onJoin={() => goToGame('join')} />
+            <LandingPage
+              onHost={() => goToGame('host')}
+              onJoin={() => goToGame('join')}
+              onOpenAdmin={() => setShowAdmin(true)}
+            />
           </motion.div>
         ) : (
           <motion.div key={game.gameState} variants={pageVariants} initial="initial" animate="animate" exit="exit" transition={{ duration: 0.25 }}>

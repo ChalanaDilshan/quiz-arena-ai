@@ -1,16 +1,103 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Zap, Upload, Users, Trophy, Brain, ArrowRight,
   Play, Share2, Sun, Moon, ChevronRight,
-  Sliders, ShieldCheck, Cpu, ChevronDown, Award, Check
+  Sliders, ShieldCheck, Cpu, ChevronDown, Award, Check,
+  LayoutDashboard, LogOut, LogIn,
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 import { InteractiveHeroDemo } from './InteractiveHeroDemo';
 
 interface LandingPageProps {
   onHost: () => void;
   onJoin: () => void;
+  onOpenAdmin: () => void;
+}
+
+// ── Auth User Menu ────────────────────────────────────────────────────────────
+function UserMenu({ onOpenAdmin }: { onOpenAdmin: () => void }) {
+  const { user, signOut, signInWithGoogle } = useAuth();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  if (!user) {
+    return (
+      <motion.button
+        whileTap={{ scale: 0.96 }}
+        onClick={signInWithGoogle}
+        className="flex items-center gap-2 text-xs font-semibold px-3.5 py-2 rounded-xl border border-rim transition-all hover:border-sienna/50 hover:bg-sienna/5"
+        style={{ color: 'var(--color-smoke)' }}
+        title="Sign in with Google to save quiz history"
+      >
+        <LogIn className="w-3.5 h-3.5" />
+        <span className="hidden sm:inline">Sign in</span>
+      </motion.button>
+    );
+  }
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="flex items-center gap-2 pl-1 pr-3 py-1 rounded-xl border border-rim hover:border-sienna/50 transition-colors"
+        title={user.displayName ?? 'Account'}
+      >
+        {user.photoURL ? (
+          <img src={user.photoURL} alt="avatar" className="w-7 h-7 rounded-full" />
+        ) : (
+          <div className="w-7 h-7 rounded-full bg-sienna flex items-center justify-center text-white text-xs font-bold">
+            {(user.displayName ?? 'H')[0].toUpperCase()}
+          </div>
+        )}
+        <span className="hidden sm:block text-xs font-semibold text-alabaster max-w-[90px] truncate">
+          {user.displayName?.split(' ')[0]}
+        </span>
+        <ChevronDown className="w-3 h-3 text-smoke" />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: -6, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -6, scale: 0.97 }}
+            transition={{ duration: 0.15 }}
+            className="absolute right-0 top-full mt-2 w-48 card rounded-xl border border-rim shadow-xl z-50 overflow-hidden"
+          >
+            <div className="px-3.5 py-2.5 border-b border-rim">
+              <p className="text-xs font-bold text-alabaster truncate">{user.displayName}</p>
+              <p className="text-[10px] text-smoke truncate mt-0.5">{user.email}</p>
+            </div>
+            <button
+              onClick={() => { setOpen(false); onOpenAdmin(); }}
+              className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-xs font-semibold text-smoke hover:text-alabaster hover:bg-sienna/10 transition-colors text-left"
+            >
+              <LayoutDashboard className="w-3.5 h-3.5 text-sienna" />
+              Admin Dashboard
+            </button>
+            <button
+              onClick={() => { setOpen(false); signOut(); }}
+              className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-xs font-semibold text-smoke hover:text-red-400 hover:bg-red-500/10 transition-colors text-left border-t border-rim"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              Sign out
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
 }
 
 // ── Theme Toggle Button ──────────────────────────────────────────────────────
@@ -40,7 +127,7 @@ function ThemeToggleButton() {
 }
 
 // ── Navbar ───────────────────────────────────────────────────────────────────
-function Navbar({ onHost, onJoin }: LandingPageProps) {
+function Navbar({ onHost, onJoin, onOpenAdmin }: LandingPageProps) {
   return (
     <header
       className="fixed top-0 inset-x-0 z-50 border-b border-rim/60"
@@ -110,6 +197,7 @@ function Navbar({ onHost, onJoin }: LandingPageProps) {
             <Upload className="w-3.5 h-3.5" />
             <span>Host Quiz</span>
           </button>
+          <UserMenu onOpenAdmin={onOpenAdmin} />
         </div>
       </div>
     </header>
@@ -155,7 +243,7 @@ function FaqItem({ question, answer }: { question: string; answer: string }) {
 }
 
 // ── Main LandingPage Component ───────────────────────────────────────────────
-export function LandingPage({ onHost, onJoin }: LandingPageProps) {
+export function LandingPage({ onHost, onJoin, onOpenAdmin }: LandingPageProps) {
   const [activeTab, setActiveTab] = useState<'host' | 'player' | 'ai'>('host');
 
   const stats = [
@@ -173,7 +261,7 @@ export function LandingPage({ onHost, onJoin }: LandingPageProps) {
       {/* Top Ambient Glow Orb */}
       <div className="hero-glow-orb top-[-100px] left-1/2 -translate-x-1/2" />
 
-      <Navbar onHost={onHost} onJoin={onJoin} />
+      <Navbar onHost={onHost} onJoin={onJoin} onOpenAdmin={onOpenAdmin} />
 
       {/* ══════════════════════════════════════════════════════════════
           HERO SECTION with INTERACTIVE DEMO

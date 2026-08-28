@@ -2,8 +2,9 @@ import { useState, useRef, type DragEvent, type ChangeEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Upload, Users, Zap, FileText, ArrowRight,
-  Sparkles, ChevronLeft, ChevronUp, ChevronDown,
+  Sparkles, ChevronLeft, ChevronUp, ChevronDown, LogIn, LayoutDashboard,
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 interface HomeViewProps {
   onJoinGame: (pin: string, nickname: string) => void;
@@ -40,6 +41,7 @@ export function HomeView({ onJoinGame, onHostGame, uploadProgress, error, initia
   const [difficulty, setDifficulty] = useState<Difficulty>('Medium');
   const pinRefs = useRef<(HTMLInputElement | null)[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const { user, signInWithGoogle } = useAuth();
 
   const handlePinChange = (i: number, v: string) => {
     if (!/^\d*$/.test(v)) return;
@@ -169,6 +171,46 @@ export function HomeView({ onJoinGame, onHostGame, uploadProgress, error, initia
               ) : hostStep === 'upload' ? (
                 <motion.div key="host-upload" initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -8 }} transition={{ duration: 0.16 }}>
                   <p className="text-[10px] uppercase tracking-widest font-semibold text-sienna mb-3">Step 1 of 2 · Upload PDF</p>
+
+                  {/* Google sign-in prompt for guests */}
+                  {!user && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      className="mb-4 px-3.5 py-3 rounded-xl border flex items-center justify-between gap-3"
+                      style={{ background: 'var(--color-canvas)', borderColor: 'var(--color-rim)' }}
+                    >
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-alabaster">Save quiz history</p>
+                        <p className="text-[10px] text-smoke mt-0.5">Sign in to track student performance.</p>
+                      </div>
+                      <button
+                        onClick={signInWithGoogle}
+                        className="flex-shrink-0 flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 rounded-lg border border-sienna/40 text-sienna hover:bg-sienna/10 transition-colors"
+                      >
+                        <LogIn className="w-3 h-3" />
+                        Sign in
+                      </button>
+                    </motion.div>
+                  )}
+
+                  {/* Signed-in badge */}
+                  {user && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="mb-4 px-3.5 py-2.5 rounded-xl border flex items-center gap-2"
+                      style={{ background: 'rgba(34,197,94,0.06)', borderColor: 'rgba(34,197,94,0.25)' }}
+                    >
+                      {user.photoURL
+                        ? <img src={user.photoURL} alt="avatar" className="w-5 h-5 rounded-full flex-shrink-0" />
+                        : <LayoutDashboard className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                      }
+                      <p className="text-[11px] font-semibold text-emerald-400 truncate">
+                        Quiz will be saved to your dashboard
+                      </p>
+                    </motion.div>
+                  )}
                   <div
                     onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}
                     onClick={() => fileInputRef.current?.click()}

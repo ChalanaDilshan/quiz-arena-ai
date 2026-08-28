@@ -3,16 +3,19 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Crown, RotateCcw, Home, Download, Printer,
   AlertTriangle, CheckCircle2, TrendingUp, Users,
-  BarChart3, FileSpreadsheet, X, HelpCircle
+  BarChart3, FileSpreadsheet, X, HelpCircle, Save,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import type { Player, QuizSession } from '../types';
+import { useAuth } from '../context/AuthContext';
+import { saveQuizRecord, buildQuizRecord } from '../utils/quizHistory';
 
 interface GameOverViewProps {
   players: Player[];
   playerId: string;
   session?: QuizSession | null;
   isHost?: boolean;
+  hostFileName?: string;
   onRestart: () => void;
 }
 
@@ -23,9 +26,11 @@ const PODIUM = [
   { rank: 2, label: '3rd', blockH: 'h-16 sm:h-20', delay: 0.60 },
 ];
 
-export function GameOverView({ players, playerId, session, isHost, onRestart }: GameOverViewProps) {
+export function GameOverView({ players, playerId, session, isHost, hostFileName = '', onRestart }: GameOverViewProps) {
   const [showPrintModal, setShowPrintModal] = useState(false);
+  const [savedToHistory, setSavedToHistory] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
+  const { user } = useAuth();
 
   const sorted = [...players].sort((a, b) => b.score - a.score);
   const totalQuestions = session?.questions.length ?? 5;
@@ -70,6 +75,21 @@ export function GameOverView({ players, playerId, session, isHost, onRestart }: 
     };
     frame();
   }, []);
+
+  // ── Auto-save quiz record for signed-in hosts ────────────────────────────
+  useEffect(() => {
+    if (!isHost || !user || !session) return;
+    const record = buildQuizRecord({
+      roomPin: session.roomPin,
+      fileName: hostFileName || 'Quiz Session',
+      difficulty: 'Medium',
+      players: session.players,
+      questions: session.questions,
+    });
+    saveQuizRecord(user.uid, record);
+    setSavedToHistory(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run once on mount
 
   // ── CSV Export Function with Formula Injection Sanitization (CWE-1236) ─────
   const exportCsvReport = () => {
@@ -148,6 +168,27 @@ export function GameOverView({ players, playerId, session, isHost, onRestart }: 
           <p className="text-xs sm:text-sm text-smoke mt-1 font-medium">
             Room PIN: <strong className="text-alabaster">{roomPin}</strong> · {sorted.length} Players Attended
           </p>
+
+          {/* Saved-to-history toast */}
+          <AnimatePresence>
+            {savedToHistory && (
+              <motion.div
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ delay: 0.8 }}
+                className="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 rounded-full text-xs font-semibold"
+                style={{
+                  background: 'rgba(34,197,94,0.12)',
+                  border: '1px solid rgba(34,197,94,0.3)',
+                  color: '#4ade80',
+                }}
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                Saved to your Admin Dashboard
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.div>
 
         {/* ── Podium ───────────────────────────────────────────────── */}
