@@ -9,6 +9,7 @@ import confetti from 'canvas-confetti';
 import type { Player, QuizSession } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { saveQuizRecord, buildQuizRecord } from '../utils/quizHistory';
+import { playGameOverSound } from '../utils/sounds';
 
 interface GameOverViewProps {
   players: Player[];
@@ -57,8 +58,9 @@ export function GameOverView({ players, playerId, session, isHost, hostFileName 
       };
   const hardestAccuracy = 33; // 33% correct rate
 
-  // ── Confetti Burst ────────────────────────────────────────────────────────
+  // ── Confetti Burst & Sound ────────────────────────────────────────────────
   useEffect(() => {
+    playGameOverSound();
     confetti({
       particleCount: 80,
       spread: 90,

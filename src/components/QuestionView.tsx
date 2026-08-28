@@ -1,6 +1,8 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { Clock, Check, X, Zap } from 'lucide-react';
+import { useEffect } from 'react';
 import type { Question } from '../types';
+import { playCorrectSound, playWrongSound } from '../utils/sounds';
 
 interface QuestionViewProps {
   question: Question;
@@ -40,6 +42,16 @@ export function QuestionView({
   };
 
   const disabled = selectedAnswer !== null || isAnswerRevealed;
+
+  useEffect(() => {
+    if (isAnswerRevealed && selectedAnswer !== null) {
+      if (selectedAnswer === question.correctIndex) {
+        playCorrectSound();
+      } else {
+        playWrongSound();
+      }
+    }
+  }, [isAnswerRevealed, selectedAnswer, question.correctIndex]);
 
   return (
     <div className="min-h-screen bg-canvas flex flex-col p-4 sm:p-6 max-w-3xl mx-auto">
