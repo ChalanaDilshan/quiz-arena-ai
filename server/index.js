@@ -2,29 +2,36 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import rateLimit from 'express-rate-limit';
-import { generateCommentary, generateSyllabusQuiz, generateTutorResponse } from './agent.js';
+import helmet from 'helmet';
 
 dotenv.config();
 
-import helmet from 'helmet';
+import { adminAuth } from './firebaseAdmin.js';
 
-const app = express();
+// ---------------------------------------------------------------------------
+// App setup
+// ---------------------------------------------------------------------------
 
-// 1. Security Headers
+const app  = express();
+const PORT = process.env.PORT || 3001;
+
+// Internal URL of the Strands Python microservice (never exposed publicly)
+const STRANDS_URL = process.env.STRANDS_URL || 'http://127.0.0.1:8001';
+
+// 1. Security headers
 app.use(helmet());
 
-// 2. Strict CORS (Localhost for now, update for production!)
-app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:5174'],
-  methods: ['GET', 'POST']
-}));
+// 2. CORS — allow only the Vite dev server (update origin for production)
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173,http://localhost:5174')
+  .split(',').map(o => o.trim());
 
-// 3. Payload Size Limits
+app.use(cors({ origin: ALLOWED_ORIGINS, methods: ['GET', 'POST'] }));
+
+// 3. Payload size limit
 app.use(express.json({ limit: '10kb' }));
 
-// 4. Rate Limiting (20 requests per 1 minute)
-// Trust one level of proxy (e.g., Render, Vercel reverse proxies)
-// Without this, all clients appear to have the same IP and share one rate-limit bucket
+// 4. Rate limiter
+// trust proxy = 1 so reverse-proxy (Render/Vercel) passes real client IP
 app.set('trust proxy', 1);
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -34,104 +41,157 @@ const apiLimiter = rateLimit({
   message: { error: 'Too many requests, please try again later.' }
 });
 
-import { adminAuth } from './firebaseAdmin.js';
+// ---------------------------------------------------------------------------
+// Auth middleware — verifies Firebase JWT for admin-only routes
+// ---------------------------------------------------------------------------
 
-// 3. Firebase JWT Auth Middleware
 const requireAgentAuth = async (req, res, next) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Missing or invalid Authorization header' });
   }
-
   const token = authHeader.split('Bearer ')[1];
   try {
-    const decodedToken = await adminAuth.verifyIdToken(token);
-    req.user = decodedToken;
+    const decoded = await adminAuth.verifyIdToken(token);
+    req.user = decoded;
     next();
-  } catch (error) {
-    console.error('Firebase Auth Error:', error);
+  } catch (err) {
+    console.error('Firebase Auth Error:', err.message);
     return res.status(403).json({ error: 'Unauthorized: Invalid token' });
   }
 };
 
-// Fake database for the Hackathon Demo
-let pendingQuiz = null;
+// ---------------------------------------------------------------------------
+// Helper — forward a request to the Strands Python service
+// ---------------------------------------------------------------------------
 
-// API route for generating commentary
+async function callStrands(path, body = {}) {
+  const res = await fetch(`${STRANDS_URL}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.text().catch(() => 'unknown error');
+    throw Object.assign(new Error(`Strands service error: ${err}`), { status: res.status });
+  }
+  return res.json();
+}
+
+async function getStrands(path) {
+  const res = await fetch(`${STRANDS_URL}${path}`);
+  if (!res.ok) throw new Error(`Strands GET error: ${res.status}`);
+  return res.json();
+}
+
+// ---------------------------------------------------------------------------
+// Routes
+// ---------------------------------------------------------------------------
+
+// --- AI Commentator (public, rate-limited) ---
 app.post('/api/commentary', apiLimiter, async (req, res) => {
   const { eventType, data } = req.body;
-  
+
   if (!eventType || typeof eventType !== 'string' || eventType.length > 50) {
     return res.status(400).json({ error: 'Invalid or oversized eventType' });
   }
-
-  // Basic validation to prevent massive prompt injection strings
   if (data && JSON.stringify(data).length > 2000) {
-    return res.status(400).json({ error: 'Data payload is too large' });
+    return res.status(400).json({ error: 'Data payload too large' });
   }
 
   try {
-    const comment = await generateCommentary(eventType, data);
-    res.json({ comment });
-  } catch (error) {
-    console.error('[Agent] Error generating commentary:', error);
+    const result = await callStrands('/commentary', {
+      event_type:  eventType,
+      player_name: data?.nickname ?? 'Unknown',
+      context:     data ? JSON.stringify(data) : '',
+    });
+    res.json({ comment: result.comment });
+  } catch (err) {
+    console.error('[Commentary] Strands error:', err.message);
     res.status(500).json({ error: 'Failed to generate commentary' });
   }
 });
 
-// --- AUTONOMOUS AGENT ENDPOINTS ---
+// --- Autonomous Syllabus Agent (admin-only) ---
 
-// 1. Simulate the Cron Job running in the background (e.g. Friday 5 PM)
+// Trigger the background agent to scan, reason, and generate a quiz
 app.post('/api/agent/trigger', requireAgentAuth, apiLimiter, async (req, res) => {
   try {
-    console.log('[Agent] Background scan triggered...');
-    pendingQuiz = await generateSyllabusQuiz();
-    console.log('[Agent] Quiz generated successfully and waiting for human approval.');
-    res.json({ success: true, message: 'Agent generated a quiz in the background.' });
-  } catch (error) {
-    console.error('[Agent] Task failed:', error);
+    console.log('[SyllabusAgent] Autonomous task triggered...');
+    const result = await callStrands('/syllabus/trigger', {});
+    console.log('[SyllabusAgent] Task complete.');
+    res.json({ success: true, message: 'Strands agent completed its autonomous task.', result });
+  } catch (err) {
+    console.error('[SyllabusAgent] Error:', err.message);
     res.status(500).json({ error: 'Agent task failed.' });
   }
 });
 
-// 2. Dashboard polls this to see if the agent surfaced a decision
-app.get('/api/agent/pending', requireAgentAuth, (req, res) => {
-  res.json({ pendingQuiz });
+// Dashboard polls for pending quiz decisions
+app.get('/api/agent/pending', requireAgentAuth, async (req, res) => {
+  try {
+    const result = await getStrands('/syllabus/pending');
+    res.json({ pendingQuiz: result.pending_quiz, filename: result.filename });
+  } catch (err) {
+    console.error('[SyllabusAgent] Pending poll error:', err.message);
+    res.json({ pendingQuiz: null });
+  }
 });
 
-// 3. Admin approves/dismisses the decision
-app.post('/api/agent/clear', requireAgentAuth, (req, res) => {
-  pendingQuiz = null;
-  res.json({ success: true });
+// Admin approves the quiz (human-in-the-loop)
+app.post('/api/agent/approve', requireAgentAuth, async (req, res) => {
+  const { filename } = req.body;
+  if (!filename) return res.status(400).json({ error: 'filename required' });
+  try {
+    await callStrands('/syllabus/approve', { filename });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Approval failed' });
+  }
 });
 
-const PORT = process.env.PORT || 3001;
+// Admin dismisses / clears the pending quiz
+app.post('/api/agent/clear', requireAgentAuth, async (req, res) => {
+  const { filename } = req.body ?? {};
+  try {
+    await callStrands('/syllabus/clear', { filename });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Clear failed' });
+  }
+});
 
-// --- POST-GAME TUTOR ENDPOINT ---
-// Accepts a question + wrong answer and returns a multi-turn AI explanation
+// --- Post-game Tutor Agent (public, rate-limited) ---
 app.post('/api/tutor/explain', apiLimiter, async (req, res) => {
-  const { questionText, playerAnswer, correctAnswer, history } = req.body;
+  const { questionText, playerAnswer, correctAnswer, sessionId, followUp } = req.body;
 
   if (!questionText || typeof questionText !== 'string' || questionText.length > 500 || !correctAnswer) {
     return res.status(400).json({ error: 'Invalid or oversized question payload' });
   }
 
-  if (history && JSON.stringify(history).length > 5000) {
-    return res.status(400).json({ error: 'Chat history is too large' });
-  }
-
   try {
-    const explanation = await generateTutorResponse(questionText, playerAnswer, correctAnswer, history);
-    res.json({ explanation });
-  } catch (error) {
-    console.error('[Tutor] Error:', error);
-    if (error.status === 429) {
+    const result = await callStrands('/tutor', {
+      session_id:     sessionId ?? '',
+      question_text:  questionText,
+      player_answer:  playerAnswer ?? '',
+      correct_answer: correctAnswer,
+      follow_up:      followUp ?? '',
+    });
+    res.json({ explanation: result.explanation, sessionId: result.session_id });
+  } catch (err) {
+    console.error('[Tutor] Strands error:', err.message);
+    if (err.status === 429) {
       return res.status(429).json({ error: 'Rate limit exceeded' });
     }
     res.status(500).json({ error: 'Tutor agent failed to respond.' });
   }
 });
 
+// ---------------------------------------------------------------------------
+// Start
+// ---------------------------------------------------------------------------
+
 app.listen(PORT, () => {
-  console.log(`AI Commentator Server running on http://localhost:${PORT}`);
+  console.log(`Quiz Arena API gateway running on http://localhost:${PORT}`);
+  console.log(`Proxying agent requests to Strands service at ${STRANDS_URL}`);
 });

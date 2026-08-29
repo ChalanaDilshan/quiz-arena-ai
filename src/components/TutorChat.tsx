@@ -18,6 +18,8 @@ export function TutorChat({ questionText, playerAnswer, correctAnswer, onClose }
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  // Strands session ID — persisted across turns so the agent remembers context
+  const [sessionId, setSessionId] = useState<string>('');
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom when new messages arrive
@@ -27,35 +29,23 @@ export function TutorChat({ questionText, playerAnswer, correctAnswer, onClose }
 
   // Fetch initial explanation on mount
   useEffect(() => {
-    fetchExplanation([], null);
+    fetchExplanation(null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const fetchExplanation = async (history: Message[], userInput: string | null) => {
+  const fetchExplanation = async (userInput: string | null) => {
     setIsLoading(true);
-
-    // Build Gemini-format history from our message array
-    const geminiHistory = history.map(m => ({
-      role: m.role,
-      parts: [{ text: m.text }]
-    }));
-
-    // If this is a follow-up, add the user's new message to history
-    if (userInput) {
-      geminiHistory.push({ role: 'user', parts: [{ text: userInput }] });
-    }
 
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/tutor/explain`, {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           questionText,
           playerAnswer,
           correctAnswer,
-          history: geminiHistory,
+          sessionId,          // Strands uses this to restore conversation history
+          followUp: userInput ?? '',
         }),
       });
 
@@ -71,6 +61,8 @@ export function TutorChat({ questionText, playerAnswer, correctAnswer, onClose }
       if (!res.ok) throw new Error('API Error');
 
       const data = await res.json();
+      // Persist the Strands session ID for subsequent turns
+      if (data.sessionId) setSessionId(data.sessionId);
       if (data.explanation) {
         setMessages(prev => [
           ...prev,
@@ -93,7 +85,7 @@ export function TutorChat({ questionText, playerAnswer, correctAnswer, onClose }
     if (!input.trim() || isLoading) return;
     const question = input.trim();
     setInput('');
-    fetchExplanation(messages, question);
+    fetchExplanation(question);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

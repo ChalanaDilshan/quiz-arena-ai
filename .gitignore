@@ -1,4 +1,4 @@
-﻿# Dependencies
+# Dependencies
 node_modules
 .pnp
 .pnp.js
@@ -40,3 +40,10 @@ Thumbs.db
 # Firebase Service Account (NEVER commit this)
 serviceAccountKey.json
 server/serviceAccountKey.json
+
+# Python virtual environment
+server/strands_agents/.venv/
+
+# Agent-generated quiz drafts (runtime data)
+server/quizzes/
+

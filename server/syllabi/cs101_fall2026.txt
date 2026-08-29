@@ -1,0 +1,20 @@
+COURSE: CS 101 - Introduction to Web Development
+SEMESTER: Fall 2026
+
+WEEK 1: HTML Fundamentals
+- Tags, attributes, semantic HTML
+- Forms and inputs
+
+WEEK 2: CSS Styling
+- Selectors, specificity
+- Flexbox and Grid
+
+WEEK 3 (UPCOMING): React Hooks Fundamentals
+- Understanding state and props
+- useState: managing local component state
+- useEffect: side effects, dependency arrays, cleanup functions
+- Rules of Hooks: top level only, no conditionals
+
+WEEK 4: Advanced State Management
+- Context API
+- useReducer
