@@ -22,13 +22,24 @@ const apiLimiter = rateLimit({
   message: { error: 'Too many requests, please try again later.' }
 });
 
-// 3. API Key Middleware
-const requireAgentAuth = (req, res, next) => {
-  const key = req.headers['x-agent-api-key'];
-  if (!key || key !== process.env.AGENT_API_KEY) {
-     return res.status(403).json({ error: 'Unauthorized agent access' });
+import { adminAuth } from './firebaseAdmin.js';
+
+// 3. Firebase JWT Auth Middleware
+const requireAgentAuth = async (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Missing or invalid Authorization header' });
   }
-  next();
+
+  const token = authHeader.split('Bearer ')[1];
+  try {
+    const decodedToken = await adminAuth.verifyIdToken(token);
+    req.user = decodedToken;
+    next();
+  } catch (error) {
+    console.error('Firebase Auth Error:', error);
+    return res.status(403).json({ error: 'Unauthorized: Invalid token' });
+  }
 };
 
 // Fake database for the Hackathon Demo
@@ -93,6 +104,9 @@ app.post('/api/tutor/explain', requireAgentAuth, apiLimiter, async (req, res) =>
     res.json({ explanation });
   } catch (error) {
     console.error('[Tutor] Error:', error);
+    if (error.status === 429) {
+      return res.status(429).json({ error: 'Rate limit exceeded' });
+    }
     res.status(500).json({ error: 'Tutor agent failed to respond.' });
   }
 });

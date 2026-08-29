@@ -49,8 +49,7 @@ export function TutorChat({ questionText, playerAnswer, correctAnswer, onClose }
       const res = await fetch('http://localhost:3001/api/tutor/explain', {
         method: 'POST',
         headers: { 
-          'Content-Type': 'application/json',
-          'x-agent-api-key': import.meta.env.VITE_AGENT_API_KEY || ''
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           questionText,

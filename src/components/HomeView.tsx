@@ -376,7 +376,7 @@ export function HomeView({ onJoinGame, onHostGame, onHostSavedQuiz, uploadProgre
         </div>
 
         <p className="text-center text-xs mt-5 text-smoke">
-          AI-powered · Created by <span className="font-semibold text-alabaster">Chalana Dilshan</span>
+          AI-powered · Developed by <span className="font-semibold text-alabaster">Chalana Dilshan</span>
         </p>
       </motion.div>
     </div>

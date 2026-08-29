@@ -362,15 +362,18 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
   const [isTriggering, setIsTriggering] = useState(false);
 
   useEffect(() => {
-    fetch('http://localhost:3001/api/agent/pending', {
-      headers: { 'x-agent-api-key': import.meta.env.VITE_AGENT_API_KEY || '' }
-    })
-      .then(res => res.json())
-      .then(data => {
-        if (data.pendingQuiz) setPendingQuiz(data.pendingQuiz);
+    if (!user) return;
+    user.getIdToken().then(token => {
+      fetch('http://localhost:3001/api/agent/pending', {
+        headers: { 'Authorization': `Bearer ${token}` }
       })
-      .catch(console.error);
-  }, []);
+        .then(res => res.json())
+        .then(data => {
+          if (data.pendingQuiz) setPendingQuiz(data.pendingQuiz);
+        })
+        .catch(console.error);
+    });
+  }, [user]);
 
   const handleApproveQuiz = () => {
     if (!user || !pendingQuiz) return;
@@ -383,35 +386,41 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
       questions: pendingQuiz,
     });
 
-    fetch('http://localhost:3001/api/agent/clear', { 
-      method: 'POST',
-      headers: { 'x-agent-api-key': import.meta.env.VITE_AGENT_API_KEY || '' }
-    })
-      .then(() => setPendingQuiz(null))
-      .catch(console.error)
-      .finally(() => setIsApproving(false));
+    user.getIdToken().then(token => {
+      fetch('http://localhost:3001/api/agent/clear', { 
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+        .then(() => setPendingQuiz(null))
+        .catch(console.error)
+        .finally(() => setIsApproving(false));
+    });
   };
 
-  const handleDismissQuiz = () => {
+  const handleDismissQuiz = async () => {
+    if (!user) return;
+    const token = await user.getIdToken();
     fetch('http://localhost:3001/api/agent/clear', { 
       method: 'POST',
-      headers: { 'x-agent-api-key': import.meta.env.VITE_AGENT_API_KEY || '' }
+      headers: { 'Authorization': `Bearer ${token}` }
     })
       .then(() => setPendingQuiz(null))
       .catch(console.error);
   };
 
-  const simulateBackgroundAgent = () => {
+  const simulateBackgroundAgent = async () => {
+    if (!user) return;
     setIsTriggering(true);
+    const token = await user.getIdToken();
     fetch('http://localhost:3001/api/agent/trigger', { 
       method: 'POST',
-      headers: { 'x-agent-api-key': import.meta.env.VITE_AGENT_API_KEY || '' }
+      headers: { 'Authorization': `Bearer ${token}` }
     })
       .then(() => {
         // Poll for the result after a few seconds
         const interval = setInterval(() => {
           fetch('http://localhost:3001/api/agent/pending', {
-            headers: { 'x-agent-api-key': import.meta.env.VITE_AGENT_API_KEY || '' }
+            headers: { 'Authorization': `Bearer ${token}` }
           })
             .then(res => res.json())
             .then(data => {

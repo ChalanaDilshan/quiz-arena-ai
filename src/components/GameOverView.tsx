@@ -477,7 +477,7 @@ export function GameOverView({ players, playerId, session, isHost, hostFileName 
         </motion.div>
 
         <p className="text-center text-xs mt-8 text-smoke">
-          Created by <span className="font-semibold text-alabaster">Chalana Dilshan</span>
+          Developed by <span className="font-semibold text-alabaster">Chalana Dilshan</span>
         </p>
       </motion.div>
 
