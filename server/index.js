@@ -6,14 +6,21 @@ import { generateCommentary, generateSyllabusQuiz, generateTutorResponse } from 
 
 dotenv.config();
 
+import helmet from 'helmet';
+
 const app = express();
 
-// 1. Strict CORS (Localhost for now, update for production!)
+// 1. Security Headers
+app.use(helmet());
+
+// 2. Strict CORS (Localhost for now, update for production!)
 app.use(cors({
   origin: ['http://localhost:5173', 'http://localhost:5174'],
   methods: ['GET', 'POST']
 }));
-app.use(express.json());
+
+// 3. Payload Size Limits
+app.use(express.json({ limit: '10kb' }));
 
 // 2. Rate Limiting (20 requests per 1 minute)
 const apiLimiter = rateLimit({
@@ -49,8 +56,13 @@ let pendingQuiz = null;
 app.post('/api/commentary', apiLimiter, async (req, res) => {
   const { eventType, data } = req.body;
   
-  if (!eventType) {
-    return res.status(400).json({ error: 'eventType is required' });
+  if (!eventType || typeof eventType !== 'string' || eventType.length > 50) {
+    return res.status(400).json({ error: 'Invalid or oversized eventType' });
+  }
+
+  // Basic validation to prevent massive prompt injection strings
+  if (data && JSON.stringify(data).length > 2000) {
+    return res.status(400).json({ error: 'Data payload is too large' });
   }
 
   try {
@@ -92,11 +104,15 @@ const PORT = process.env.PORT || 3001;
 
 // --- POST-GAME TUTOR ENDPOINT ---
 // Accepts a question + wrong answer and returns a multi-turn AI explanation
-app.post('/api/tutor/explain', requireAgentAuth, apiLimiter, async (req, res) => {
+app.post('/api/tutor/explain', apiLimiter, async (req, res) => {
   const { questionText, playerAnswer, correctAnswer, history } = req.body;
 
-  if (!questionText || !correctAnswer) {
-    return res.status(400).json({ error: 'questionText and correctAnswer are required' });
+  if (!questionText || typeof questionText !== 'string' || questionText.length > 500 || !correctAnswer) {
+    return res.status(400).json({ error: 'Invalid or oversized question payload' });
+  }
+
+  if (history && JSON.stringify(history).length > 5000) {
+    return res.status(400).json({ error: 'Chat history is too large' });
   }
 
   try {

@@ -364,7 +364,7 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
   useEffect(() => {
     if (!user) return;
     user.getIdToken().then(token => {
-      fetch('http://localhost:3001/api/agent/pending', {
+      fetch(`${import.meta.env.VITE_API_URL}/api/agent/pending`, {
         headers: { 'Authorization': `Bearer ${token}` }
       })
         .then(res => res.json())
@@ -387,7 +387,7 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
     });
 
     user.getIdToken().then(token => {
-      fetch('http://localhost:3001/api/agent/clear', { 
+      fetch(`${import.meta.env.VITE_API_URL}/api/agent/clear`, { 
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       })
@@ -400,7 +400,7 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
   const handleDismissQuiz = async () => {
     if (!user) return;
     const token = await user.getIdToken();
-    fetch('http://localhost:3001/api/agent/clear', { 
+    fetch(`${import.meta.env.VITE_API_URL}/api/agent/clear`, { 
       method: 'POST',
       headers: { 'Authorization': `Bearer ${token}` }
     })
@@ -412,14 +412,14 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
     if (!user) return;
     setIsTriggering(true);
     const token = await user.getIdToken();
-    fetch('http://localhost:3001/api/agent/trigger', { 
+    fetch(`${import.meta.env.VITE_API_URL}/api/agent/trigger`, { 
       method: 'POST',
       headers: { 'Authorization': `Bearer ${token}` }
     })
       .then(() => {
         // Poll for the result after a few seconds
         const interval = setInterval(() => {
-          fetch('http://localhost:3001/api/agent/pending', {
+          fetch(`${import.meta.env.VITE_API_URL}/api/agent/pending`, {
             headers: { 'Authorization': `Bearer ${token}` }
           })
             .then(res => res.json())

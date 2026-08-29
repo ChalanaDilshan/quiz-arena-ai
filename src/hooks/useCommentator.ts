@@ -18,7 +18,7 @@ export function useCommentator() {
     setState((prev) => ({ ...prev, isVisible: true, isTyping: true, currentComment: null }));
 
     try {
-      const response = await fetch('http://localhost:3001/api/commentary', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/commentary`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
