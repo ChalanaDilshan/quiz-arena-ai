@@ -20,6 +20,19 @@ Tone Guidelines:
 - NEVER sound like a boring robot. You are a lively host!
 `;
 
+const TUTOR_SYSTEM_PROMPT = `
+You are "Professor Q", a warm, patient, and encouraging AI tutor embedded in Quiz Arena.
+A student just finished a quiz and got a question wrong. Your job is to help them understand WHY they were wrong and teach them the correct concept.
+
+Guidelines:
+- Be warm, supportive, and never condescending.
+- Start by acknowledging their attempt, then gently correct their misconception.
+- Keep explanations concise but clear (3-5 sentences for the initial explanation).
+- Use simple analogies or real-world examples where helpful.
+- For follow-up questions, answer them directly and build on what you've already explained.
+- End your first message with a gentle prompt encouraging them to ask if they have more questions.
+`;
+
 /**
  * Generates commentary based on the game event.
  * @param {string} eventType - E.g., 'LOBBY_START', 'QUESTION_REVEALED', 'ANSWER_REVEALED', 'LEADERBOARD'
@@ -27,21 +40,27 @@ Tone Guidelines:
  * @returns {Promise<string>} The generated commentary text
  */
 export async function generateCommentary(eventType, data) {
+
   if (!process.env.GEMINI_API_KEY) {
     return "Whoops! The producers forgot to pay the electric bill (Missing API Key).";
   }
+
+  // Basic Prompt Injection Defense
+  const sanitize = (str) => String(str).replace(/instruction|system|ignore|bypass/gi, '***');
+  const safeNickname = data.nickname ? sanitize(data.nickname) : 'Unknown';
 
   let eventContext = '';
 
   switch (eventType) {
     case 'HOT_STREAK':
-      eventContext = `Player ${data.nickname} is on fire with a ${data.streak}-question correct streak! Hype them up!`;
+      eventContext = `Player ${safeNickname} is on fire with a ${data.streak}-question correct streak! Hype them up!`;
       break;
     case 'COLD_STREAK':
-      eventContext = `Player ${data.nickname} has gotten ${data.wrongStreak} questions wrong in a row. Give them some gentle, humorous encouragement (or light teasing).`;
+      eventContext = `Player ${safeNickname} has gotten ${data.wrongStreak} questions wrong in a row. Give them some gentle, humorous encouragement (or light teasing).`;
       break;
     default:
-      eventContext = `A generic event occurred: ${JSON.stringify(data)}`;
+      // Strip out the raw JSON stringify to prevent complex injections
+      eventContext = `A generic event occurred for player ${safeNickname}.`;
   }
 
   const userPrompt = `Event Type: ${eventType}\nContext: ${eventContext}\n\nGenerate your host commentary now:`;
@@ -117,6 +136,51 @@ ${syllabusText}
     return JSON.parse(response.text);
   } catch (error) {
     console.error("Failed to generate syllabus quiz:", error);
+    throw error;
+  }
+}
+
+/**
+ * Post-Game Tutor Agent
+ * Explains why a player's answer was wrong using a multi-turn conversation.
+ * @param {string} questionText - The question that was asked
+ * @param {string} playerAnswer - What the player answered
+ * @param {string} correctAnswer - The correct answer
+ * @param {Array} history - Previous messages [{role: 'user'|'model', parts: [{text}]}]
+ * @returns {Promise<string>} The tutor's explanation
+ */
+export async function generateTutorResponse(questionText, playerAnswer, correctAnswer, history = []) {
+  if (!process.env.GEMINI_API_KEY) {
+    throw new Error("Missing API Key");
+  }
+
+  // Build the initial user message if history is empty (first call)
+  let contents = history.length > 0
+    ? history
+    : [{
+        role: 'user',
+        parts: [{
+          text: `I just answered a quiz question wrong. Here are the details:
+Question: "${questionText}"
+My answer: "${playerAnswer}"
+Correct answer: "${correctAnswer}"
+
+Please explain why my answer was wrong and help me understand the correct concept.`
+        }]
+      }];
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents,
+      config: {
+        systemInstruction: TUTOR_SYSTEM_PROMPT,
+        temperature: 0.7,
+      }
+    });
+    return response.text;
+  } catch (error) {
+    console.error("Tutor Agent Error:", error);
     throw error;
   }
 }

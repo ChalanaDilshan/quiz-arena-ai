@@ -3,13 +3,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Crown, RotateCcw, Home, Download, Printer,
   AlertTriangle, CheckCircle2, TrendingUp, Users,
-  BarChart3, FileSpreadsheet, X, HelpCircle, Save,
+  BarChart3, FileSpreadsheet, X, HelpCircle, Save, GraduationCap,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import type { Player, QuizSession } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { saveQuizRecord, buildQuizRecord } from '../utils/quizHistory';
 import { playGameOverSound } from '../utils/sounds';
+import { TutorChat } from './TutorChat';
 
 interface GameOverViewProps {
   players: Player[];
@@ -30,6 +31,7 @@ const PODIUM = [
 export function GameOverView({ players, playerId, session, isHost, hostFileName = '', onRestart }: GameOverViewProps) {
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [savedToHistory, setSavedToHistory] = useState(false);
+  const [showTutor, setShowTutor] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
 
@@ -343,7 +345,7 @@ export function GameOverView({ players, playerId, session, isHost, hostFileName 
           {/* Hardest Question Callout */}
           <div className="mt-4 p-3.5 rounded-xl border border-amber-500/20 bg-amber-500/10 flex items-start gap-3">
             <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
-            <div className="text-xs">
+            <div className="text-xs flex-1">
               <div className="flex items-center gap-2 mb-1">
                 <span className="font-bold text-amber-600 dark:text-amber-400">
                   Hardest Question ({hardestAccuracy}% Correct Rate)
@@ -353,13 +355,37 @@ export function GameOverView({ players, playerId, session, isHost, hostFileName 
               <p className="font-medium text-alabaster mb-1">
                 "{hardestQuestion.text}"
               </p>
-              <p className="text-smoke">
+              <p className="text-smoke mb-2">
                 Correct Answer: <strong className="text-emerald-500">{hardestQuestion.options[hardestQuestion.correctIndex]}</strong>
                 {hardestQuestion.explanation && ` — ${hardestQuestion.explanation}`}
               </p>
+              <button
+                onClick={() => setShowTutor(true)}
+                className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg transition-all duration-150 hover:scale-105"
+                style={{
+                  background: 'rgba(224,122,95,0.15)',
+                  border: '1px solid rgba(224,122,95,0.35)',
+                  color: 'var(--color-sienna, #E07A5F)',
+                }}
+              >
+                <GraduationCap className="w-3.5 h-3.5" />
+                Ask AI Tutor — why was this hard?
+              </button>
             </div>
           </div>
         </motion.div>
+
+        {/* Tutor Chat Modal */}
+        <AnimatePresence>
+          {showTutor && (
+            <TutorChat
+              questionText={hardestQuestion.text}
+              playerAnswer={hardestQuestion.options[0]}
+              correctAnswer={hardestQuestion.options[hardestQuestion.correctIndex]}
+              onClose={() => setShowTutor(false)}
+            />
+          )}
+        </AnimatePresence>
 
         {/* ── Complete Attendance & Breakdown Roster ───────────────── */}
         <motion.div

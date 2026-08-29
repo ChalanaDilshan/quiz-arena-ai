@@ -362,7 +362,9 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
   const [isTriggering, setIsTriggering] = useState(false);
 
   useEffect(() => {
-    fetch('http://localhost:3001/api/agent/pending')
+    fetch('http://localhost:3001/api/agent/pending', {
+      headers: { 'x-agent-api-key': import.meta.env.VITE_AGENT_API_KEY || '' }
+    })
       .then(res => res.json())
       .then(data => {
         if (data.pendingQuiz) setPendingQuiz(data.pendingQuiz);
@@ -381,25 +383,36 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
       questions: pendingQuiz,
     });
 
-    fetch('http://localhost:3001/api/agent/clear', { method: 'POST' })
+    fetch('http://localhost:3001/api/agent/clear', { 
+      method: 'POST',
+      headers: { 'x-agent-api-key': import.meta.env.VITE_AGENT_API_KEY || '' }
+    })
       .then(() => setPendingQuiz(null))
       .catch(console.error)
       .finally(() => setIsApproving(false));
   };
 
   const handleDismissQuiz = () => {
-    fetch('http://localhost:3001/api/agent/clear', { method: 'POST' })
+    fetch('http://localhost:3001/api/agent/clear', { 
+      method: 'POST',
+      headers: { 'x-agent-api-key': import.meta.env.VITE_AGENT_API_KEY || '' }
+    })
       .then(() => setPendingQuiz(null))
       .catch(console.error);
   };
 
   const simulateBackgroundAgent = () => {
     setIsTriggering(true);
-    fetch('http://localhost:3001/api/agent/trigger', { method: 'POST' })
+    fetch('http://localhost:3001/api/agent/trigger', { 
+      method: 'POST',
+      headers: { 'x-agent-api-key': import.meta.env.VITE_AGENT_API_KEY || '' }
+    })
       .then(() => {
         // Poll for the result after a few seconds
         const interval = setInterval(() => {
-          fetch('http://localhost:3001/api/agent/pending')
+          fetch('http://localhost:3001/api/agent/pending', {
+            headers: { 'x-agent-api-key': import.meta.env.VITE_AGENT_API_KEY || '' }
+          })
             .then(res => res.json())
             .then(data => {
               if (data.pendingQuiz) {
