@@ -45,8 +45,14 @@ export async function generateCommentary(eventType, data) {
     return "Whoops! The producers forgot to pay the electric bill (Missing API Key).";
   }
 
-  // Basic Prompt Injection Defense
-  const sanitize = (str) => String(str).replace(/instruction|system|ignore|bypass/gi, '***');
+  // Structural sanitizer: strip non-printable/control chars and truncate.
+  // Avoids fragile word-blacklists that can be bypassed with encoding tricks.
+  const sanitize = (str, maxLen = 80) =>
+    String(str)
+      .replace(/[\x00-\x1F\x7F]/g, '')  // strip control characters
+      .replace(/[<>"'`]/g, '')            // strip common injection chars
+      .slice(0, maxLen);
+
   const safeNickname = data.nickname ? sanitize(data.nickname) : 'Unknown';
 
   let eventContext = '';
@@ -91,7 +97,13 @@ export async function generateSyllabusQuiz() {
     throw new Error("Missing API Key");
   }
 
-  const syllabusText = fs.readFileSync('sample_syllabus.txt', 'utf-8');
+  const rawSyllabus = fs.readFileSync('sample_syllabus.txt', 'utf-8');
+
+  // Sanitize syllabus: strip control characters and limit size to prevent
+  // prompt injection via a crafted syllabus file.
+  const syllabusText = rawSyllabus
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '') // strip control chars (keep \n, \r, \t)
+    .slice(0, 8000); // cap at 8000 chars to prevent runaway token costs
 
   const SYLLABUS_PROMPT = `
 You are an autonomous teacher's assistant agent.

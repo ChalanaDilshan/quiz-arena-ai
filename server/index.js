@@ -22,10 +22,15 @@ app.use(cors({
 // 3. Payload Size Limits
 app.use(express.json({ limit: '10kb' }));
 
-// 2. Rate Limiting (20 requests per 1 minute)
+// 4. Rate Limiting (20 requests per 1 minute)
+// Trust one level of proxy (e.g., Render, Vercel reverse proxies)
+// Without this, all clients appear to have the same IP and share one rate-limit bucket
+app.set('trust proxy', 1);
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
   message: { error: 'Too many requests, please try again later.' }
 });
 
