@@ -199,25 +199,25 @@ export function InteractiveHeroDemo({ onHost, onJoin }: InteractiveHeroDemoProps
       {!hasInteracted && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: [0, -6, 0] }}
+          animate={{ opacity: 1, y: [0, -8, 0] }}
           transition={{
             y: { repeat: Infinity, duration: 2, ease: 'easeInOut' },
             opacity: { duration: 0.3 }
           }}
-          className="absolute -top-11 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-sienna text-white text-xs font-bold shadow-lg shadow-sienna/20 select-none whitespace-nowrap cursor-default"
+          className="absolute -top-14 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-sienna to-amber-600 text-white text-xs font-bold shadow-[0_0_20px_rgba(224,122,95,0.4)] select-none whitespace-nowrap cursor-default border border-white/20 backdrop-blur-md"
         >
-          <Sparkles className="w-3.5 h-3.5 animate-spin-slow" />
+          <Sparkles className="w-4 h-4 animate-pulse" />
           <span>Interactive Demo — Click an answer!</span>
         </motion.div>
       )}
 
       {/* ── Floating Live Leaderboard Widget ─────────────────────────── */}
       <motion.div
-        initial={{ opacity: 0, x: 20 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ delay: 0.3, duration: 0.4 }}
-        className="card absolute -right-3 sm:-right-7 -top-6 z-20 p-3.5 min-w-[150px] shadow-xl border border-rim rounded-xl"
-        style={{ backdropFilter: 'blur(12px)' }}
+        initial={{ opacity: 0, x: 20, y: 10 }}
+        animate={{ opacity: 1, x: 0, y: 0 }}
+        transition={{ delay: 0.3, duration: 0.5, type: 'spring' }}
+        className="absolute -right-2 sm:-right-8 -top-8 z-20 p-4 min-w-[160px] shadow-[0_8px_30px_rgb(0,0,0,0.4)] border border-white/10 rounded-2xl bg-elevated/80"
+        style={{ backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' }}
       >
         <div className="flex items-center justify-between gap-2 mb-2 pb-1.5 border-b border-rim">
           <div className="flex items-center gap-1.5">
@@ -255,10 +255,10 @@ export function InteractiveHeroDemo({ onHost, onJoin }: InteractiveHeroDemoProps
 
       {/* ── Floating Streak & Score Badge ────────────────────────────── */}
       <motion.div
-        initial={{ opacity: 0, scale: 0.8 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ delay: 0.4 }}
-        className="card absolute -left-3 sm:-left-6 -bottom-5 z-20 px-3.5 py-2 flex items-center gap-2.5 shadow-xl border border-rim rounded-xl"
+        initial={{ opacity: 0, scale: 0.8, y: 10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ delay: 0.4, duration: 0.5, type: 'spring' }}
+        className="absolute -left-2 sm:-left-8 -bottom-6 z-20 px-4 py-3 flex items-center gap-3 shadow-[0_8px_30px_rgb(0,0,0,0.4)] border border-white/10 rounded-2xl bg-elevated/80 backdrop-blur-xl"
       >
         <div className="w-7 h-7 rounded-lg bg-sienna-wash flex items-center justify-center text-sienna">
           <Flame className="w-4 h-4 animate-bounce" />
@@ -286,11 +286,11 @@ export function InteractiveHeroDemo({ onHost, onJoin }: InteractiveHeroDemoProps
 
       {/* ── MAIN QUIZ CARD ───────────────────────────────────────────── */}
       <motion.div
-        className="card rounded-2xl p-5 sm:p-6 shadow-2xl relative z-10 border border-rim overflow-hidden"
-        style={{
-          background: 'var(--color-elevated)',
-        }}
+        className="rounded-3xl p-6 sm:p-8 shadow-[0_20px_50px_rgba(0,0,0,0.5)] relative z-10 border border-white/10 overflow-hidden bg-elevated/60 backdrop-blur-xl"
       >
+        {/* Subtle Inner Highlight */}
+        <div className="absolute inset-0 rounded-3xl pointer-events-none border border-white/5 mix-blend-overlay" />
+
         {/* Card Header: Category & Timer */}
         <div className="flex items-center justify-between gap-2 mb-3">
           <span className="badge text-[10px] !py-0.5 !px-2 font-bold tracking-wide">
@@ -312,17 +312,27 @@ export function InteractiveHeroDemo({ onHost, onJoin }: InteractiveHeroDemoProps
         </div>
 
         {/* Question Text */}
-        <div className="min-h-[58px] mb-5">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-smoke mb-1 block">
-            Sample Question {qIndex + 1} of {DEMO_QUESTIONS.length}
-          </span>
-          <h3 className="text-alabaster font-bold text-sm sm:text-base leading-snug">
-            {currentQ.question}
-          </h3>
-        </div>
+        <AnimatePresence mode="wait">
+          <motion.div 
+            key={qIndex}
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 10 }}
+            transition={{ duration: 0.3 }}
+            className="min-h-[64px] mb-6"
+          >
+            <span className="text-[10px] font-bold uppercase tracking-widest text-smoke mb-2 block flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-sienna"></span>
+              Sample Question {qIndex + 1} of {DEMO_QUESTIONS.length}
+            </span>
+            <h3 className="text-alabaster font-extrabold text-base sm:text-lg leading-relaxed">
+              {currentQ.question}
+            </h3>
+          </motion.div>
+        </AnimatePresence>
 
         {/* 2×2 Answer Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mb-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4 relative z-10">
           {currentQ.options.map((option, idx) => {
             const pad = PAD_COLORS[idx];
             const isSelected = selectedAnswer === idx;
@@ -346,25 +356,35 @@ export function InteractiveHeroDemo({ onHost, onJoin }: InteractiveHeroDemoProps
 
             return (
               <motion.button
-                key={idx}
-                whileHover={!isRevealed ? { scale: 1.02, y: -1 } : {}}
-                whileTap={!isRevealed ? { scale: 0.97 } : {}}
+                key={`${qIndex}-${idx}`}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: opacity, y: 0 }}
+                transition={{ duration: 0.3, delay: idx * 0.05 }}
+                whileHover={!isRevealed ? { 
+                  scale: 1.02, 
+                  y: -2,
+                  boxShadow: `0 10px 25px -5px ${buttonBg}80`,
+                  filter: 'brightness(1.15)'
+                } : {}}
+                whileTap={!isRevealed ? { scale: 0.98, y: 0 } : {}}
                 onClick={() => handleSelectOption(idx)}
                 disabled={isRevealed}
                 style={{
                   backgroundColor: buttonBg,
-                  boxShadow: ring,
-                  opacity,
+                  boxShadow: ring !== 'none' ? ring : `inset 0 2px 0 0 rgba(255,255,255,0.1), inset 0 -4px 0 0 rgba(0,0,0,0.2)`,
                 }}
-                className={`relative p-3.5 sm:p-4 rounded-xl text-left font-semibold text-white transition-all duration-200 cursor-pointer ${
-                  isRevealed ? 'cursor-default' : 'hover:brightness-110'
+                className={`relative p-4 sm:p-5 rounded-2xl text-left font-semibold text-white transition-colors duration-300 cursor-pointer overflow-hidden ${
+                  isRevealed ? 'cursor-default' : ''
                 }`}
               >
-                <div className="flex items-center gap-2.5">
-                  <span className="w-6 h-6 rounded-lg bg-black/25 flex items-center justify-center text-xs font-extrabold flex-shrink-0">
+                {/* Subtle gradient overlay for depth */}
+                <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent pointer-events-none" />
+                
+                <div className="flex items-center gap-3 relative z-10">
+                  <span className="w-7 h-7 rounded-lg bg-black/30 shadow-inner flex items-center justify-center text-sm font-extrabold flex-shrink-0 backdrop-blur-sm border border-white/10">
                     {pad.letter}
                   </span>
-                  <span className="text-xs sm:text-sm font-medium leading-snug line-clamp-2">
+                  <span className="text-sm sm:text-base font-bold leading-snug line-clamp-2 text-shadow-sm">
                     {option}
                   </span>
                 </div>
@@ -419,12 +439,12 @@ export function InteractiveHeroDemo({ onHost, onJoin }: InteractiveHeroDemoProps
                   <HelpCircle className="w-4 h-4 text-rose-500 flex-shrink-0 mt-0.5" />
                 )}
                 <div>
-                  <p className="font-bold mb-0.5">
+                  <p className="font-bold mb-0.5 text-inherit">
                     {selectedAnswer === currentQ.correctIndex
                       ? `🎉 Correct! You earned +${lastDelta} points (Rank #${yourRank})`
                       : `Nice try! The correct answer was "${currentQ.options[currentQ.correctIndex]}".`}
                   </p>
-                  <p className="text-[11px] opacity-85 leading-relaxed">
+                  <p className="text-[11px] opacity-85 leading-relaxed text-inherit">
                     {currentQ.explanation}
                   </p>
                 </div>

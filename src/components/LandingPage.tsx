@@ -192,10 +192,10 @@ function Navbar({ onHost, onJoin, onOpenAdmin }: LandingPageProps) {
           </button>
           <button
             onClick={onHost}
-            className="btn-primary text-sm !py-2 !px-4.5 flex items-center gap-1.5"
+            className="btn-primary text-sm !py-2 !px-3 sm:!px-4.5 flex items-center gap-1.5"
           >
-            <Upload className="w-3.5 h-3.5" />
-            <span>Host Quiz</span>
+            <Upload className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
+            <span className="hidden sm:inline">Host Quiz</span>
           </button>
           <UserMenu onOpenAdmin={onOpenAdmin} />
         </div>
@@ -349,10 +349,10 @@ export function LandingPage({ onHost, onJoin, onOpenAdmin }: LandingPageProps) {
           {/* Right Column — Interactive Hero Demo */}
           <motion.div
             id="interactive-demo"
-            initial={{ opacity: 0, scale: 0.96 }}
-            animate={{ opacity: 1, scale: 1 }}
+            initial={{ opacity: 0, scale: 0.96, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
-            className="lg:col-span-5 relative w-full"
+            className="lg:col-span-5 relative w-full mt-8 lg:mt-16"
           >
             <InteractiveHeroDemo onHost={onHost} onJoin={onJoin} />
           </motion.div>
