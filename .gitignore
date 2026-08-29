@@ -43,7 +43,8 @@ server/serviceAccountKey.json
 
 # Python virtual environment
 server/strands_agents/.venv/
+**/.venv/
+**/__pycache__/
 
 # Agent-generated quiz drafts (runtime data)
 server/quizzes/
-

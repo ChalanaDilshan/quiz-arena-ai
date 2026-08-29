@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { io, Socket } from 'socket.io-client';
 import type { GameState, Question, Player, QuizSession } from '../types';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -105,7 +106,7 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
   const [error, setError] = useState<string | null>(null);
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const wsRef = useRef<WebSocket | null>(null);
+  const socketRef = useRef<Socket | null>(null);
 
   // Derived state
   const currentQuestion = session
@@ -192,49 +193,36 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
 
   // ── WebSocket message handler (live mode) ──────────────────────────────
 
-  const handleWsMessage = useCallback(
-    (msg: { action: string; payload: Record<string, unknown> }) => {
-      switch (msg.action) {
-        case 'playerJoined':
-          setSession(prev =>
-            prev ? { ...prev, players: msg.payload.players as Player[] } : null,
-          );
-          break;
-        case 'newQuestion':
-          setGameState('QUESTION');
-          setSelectedAnswer(null);
-          setIsAnswerRevealed(false);
-          setSession(prev => {
-            if (!prev) return null;
-            const q = msg.payload.question as Question;
-            const idx = msg.payload.questionIndex as number;
-            const qs = [...prev.questions];
-            qs[idx] = q;
-            return { ...prev, currentQuestionIndex: idx, questions: qs };
-          });
-          startTimer((msg.payload.question as Question).timeLimit);
-          break;
-        case 'showLeaderboard':
-          setGameState('LEADERBOARD');
-          clearTimer();
-          setSession(prev =>
-            prev ? { ...prev, players: msg.payload.players as Player[] } : null,
-          );
-          break;
-        case 'gameOver':
-          setGameState('GAME_OVER');
-          clearTimer();
-          setSession(prev =>
-            prev ? { ...prev, players: msg.payload.players as Player[] } : null,
-          );
-          break;
-        case 'error':
-          setError(msg.payload.message as string);
-          break;
+  const setupSocketListeners = useCallback((socket: Socket, pin: string) => {
+    socket.on('gameStateUpdate', (state) => {
+      setGameState(state.state);
+      setSession(prev => {
+        const questions = prev?.questions || [];
+        if (state.currentQuestion && state.state === 'QUESTION') {
+          questions[state.currentQuestionIndex] = state.currentQuestion;
+        }
+        return {
+          roomPin: pin,
+          hostId: prev?.hostId || '',
+          currentQuestionIndex: state.currentQuestionIndex,
+          players: state.players,
+          questions: prev?.questions || [],
+          gameState: state.state
+        };
+      });
+      setTimeRemaining(state.timeRemaining);
+      
+      if (state.state === 'QUESTION') {
+        // Only clear selected answer if it's a fresh question start
+        setIsAnswerRevealed(false);
       }
-    },
-    [startTimer, clearTimer],
-  );
+      if (state.state === 'LEADERBOARD' || state.state === 'GAME_OVER') {
+        setIsAnswerRevealed(true);
+      }
+    });
+
+    socket.on('error', (msg) => setError(msg));
+  }, []);
 
   // ── Actions ────────────────────────────────────────────────────────────
 
@@ -267,26 +255,20 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
 
       // ── Live WebSocket join ──
       try {
-        const wsUrl = `${import.meta.env.VITE_WS_URL ?? ''}?pin=${encodeURIComponent(pin)}&nickname=${encodeURIComponent(nickname)}`;
-        const ws = new WebSocket(wsUrl);
-        wsRef.current = ws;
-        ws.onopen = () =>
-          ws.send(JSON.stringify({ action: 'joinRoom', payload: { pin, nickname, playerId } }));
-        ws.onmessage = e => {
-          try {
-            const data = JSON.parse(e.data);
-            handleWsMessage(data);
-          } catch (err) {
-            console.error('Failed to parse incoming WebSocket message:', err);
-          }
-        };
-        ws.onerror = () => setError('Connection failed. Please try again.');
-        ws.onclose = () => console.info('WebSocket connection closed.');
+        const url = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+        const socket = io(url);
+        socketRef.current = socket;
+        
+        socket.on('connect', () => {
+          socket.emit('joinGame', { pin, nickname, playerId });
+        });
+        
+        setupSocketListeners(socket, pin);
       } catch {
         setError('Could not connect to game server.');
       }
     },
-    [useMockMode, playerId, buildMockPlayers, handleWsMessage],
+    [useMockMode, playerId, buildMockPlayers, setupSocketListeners],
   );
 
   const hostGame = useCallback(
@@ -346,89 +328,123 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
     (quiz: { topic: string; questions: Question[] }) => {
       setError(null);
       const pin = generatePin();
-      const host: Player = {
-        id: playerId,
-        nickname: 'Host',
-        score: 0,
-        streak: 0,
-        avatarColor: AVATAR_COLORS[0],
-        isHost: true,
-      };
-      setSession({
-        roomPin: pin,
-        questions: quiz.questions,
-        players: [host, ...buildMockPlayers()],
-        currentQuestionIndex: 0,
-        gameState: 'LOBBY',
-        hostId: playerId,
-      });
-      setIsHost(true);
-      setGameState('LOBBY');
+      
+      if (useMockMode) {
+        const host: Player = {
+          id: playerId,
+          nickname: 'Host',
+          score: 0,
+          streak: 0,
+          avatarColor: AVATAR_COLORS[0],
+          isHost: true,
+        };
+        setSession({
+          roomPin: pin,
+          questions: quiz.questions,
+          players: [host, ...buildMockPlayers()],
+          currentQuestionIndex: 0,
+          gameState: 'LOBBY',
+          hostId: playerId,
+        });
+        setIsHost(true);
+        setGameState('LOBBY');
+        return;
+      }
+
+      // Live mode
+      try {
+        const url = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+        const socket = io(url);
+        socketRef.current = socket;
+        
+        socket.on('connect', () => {
+          socket.emit('hostGame', { pin, quizData: quiz });
+        });
+        
+        setupSocketListeners(socket, pin);
+        setIsHost(true);
+      } catch {
+        setError('Could not connect to game server.');
+      }
     },
-    [playerId, buildMockPlayers],
+    [playerId, buildMockPlayers, useMockMode, setupSocketListeners],
   );
 
   const startGame = useCallback(() => {
     if (!session) return;
-    setSession(prev => (prev ? { ...prev, gameState: 'QUESTION', currentQuestionIndex: 0 } : null));
-    setSelectedAnswer(null);
-    setIsAnswerRevealed(false);
-    setGameState('QUESTION');
-    startTimer(session.questions[0]?.timeLimit ?? 20);
-  }, [session, startTimer]);
+    
+    if (useMockMode) {
+      setSession(prev => (prev ? { ...prev, gameState: 'QUESTION', currentQuestionIndex: 0 } : null));
+      setSelectedAnswer(null);
+      setIsAnswerRevealed(false);
+      setGameState('QUESTION');
+      startTimer(session.questions[0]?.timeLimit ?? 20);
+    } else {
+      socketRef.current?.emit('startGame', { pin: session.roomPin });
+    }
+  }, [session, startTimer, useMockMode]);
 
   const submitAnswer = useCallback(
     (answerIndex: number) => {
-      if (selectedAnswer !== null || !currentQuestion || isAnswerRevealed) return;
+      if (selectedAnswer !== null || isAnswerRevealed) return;
       setSelectedAnswer(answerIndex);
 
-      const correct = answerIndex === currentQuestion.correctIndex;
+      if (useMockMode) {
+        if (!currentQuestion) return;
+        const correct = answerIndex === currentQuestion.correctIndex;
+        // Update the real player's score
+        setSession(prev => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            players: prev.players.map(p => {
+              if (p.id !== playerId) return p;
+              const delta = calculateScore(correct, timeRemaining, p.streak);
+              return {
+                ...p,
+                score: p.score + delta,
+                streak: correct ? p.streak + 1 : 0,
+                lastAnswerCorrect: correct,
+                lastScoreDelta: delta,
+                correctCount: (p.correctCount ?? 0) + (correct ? 1 : 0),
+                answersGiven: (p.answersGiven ?? 0) + 1,
+                wrongStreak: correct ? 0 : (p.wrongStreak ?? 0) + 1,
+              };
+            }),
+          };
+        });
 
-      // Update the real player's score
-      setSession(prev => {
-        if (!prev) return null;
-        return {
-          ...prev,
-          players: prev.players.map(p => {
-            if (p.id !== playerId) return p;
-            const delta = calculateScore(correct, timeRemaining, p.streak);
-            return {
-              ...p,
-              score: p.score + delta,
-              streak: correct ? p.streak + 1 : 0,
-              lastAnswerCorrect: correct,
-              lastScoreDelta: delta,
-              correctCount: (p.correctCount ?? 0) + (correct ? 1 : 0),
-              answersGiven: (p.answersGiven ?? 0) + 1,
-              wrongStreak: correct ? 0 : (p.wrongStreak ?? 0) + 1,
-            };
-          }),
-        };
-      });
-
-      // Brief pause then reveal the correct answer
-      setTimeout(() => {
-        setIsAnswerRevealed(true);
-        clearTimer();
-      }, 500);
+        // Brief pause then reveal the correct answer
+        setTimeout(() => {
+          setIsAnswerRevealed(true);
+          clearTimer();
+        }, 500);
+      } else {
+        socketRef.current?.emit('submitAnswer', { pin: session?.roomPin, playerId, answerIndex });
+      }
     },
-    [selectedAnswer, currentQuestion, isAnswerRevealed, timeRemaining, playerId, calculateScore, clearTimer],
+    [selectedAnswer, currentQuestion, isAnswerRevealed, timeRemaining, playerId, calculateScore, clearTimer, useMockMode, session],
   );
 
   const nextQuestion = useCallback(() => {
     if (!session || gameState !== 'LEADERBOARD') return;
 
-    const nextIdx = session.currentQuestionIndex + 1;
-    if (nextIdx >= session.questions.length) {
-      setGameState('GAME_OVER');
+    if (useMockMode) {
+      const nextIdx = session.currentQuestionIndex + 1;
+      if (nextIdx >= session.questions.length) {
+        setGameState('GAME_OVER');
+      } else {
+        setSession(prev => (prev ? { ...prev, currentQuestionIndex: nextIdx } : null));
+        setSelectedAnswer(null);
+        setIsAnswerRevealed(false);
+        setGameState('QUESTION');
+        startTimer(session.questions[nextIdx]?.timeLimit ?? 20);
+      }
     } else {
-      setSession(prev => (prev ? { ...prev, currentQuestionIndex: nextIdx } : null));
-      setSelectedAnswer(null);
-      setIsAnswerRevealed(false);
-      setGameState('QUESTION');
-      startTimer(session.questions[nextIdx]?.timeLimit ?? 20);
+      socketRef.current?.emit('nextQuestion', { pin: session.roomPin });
+      setSelectedAnswer(null); // Reset selection
     }
-  }, [session, gameState, startTimer]);
+  }, [session, gameState, startTimer, useMockMode]);
 
   const resetGame = useCallback(() => {
     clearTimer();
@@ -439,8 +455,8 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
     setIsHost(false);
     setUploadProgress(0);
     setError(null);
-    wsRef.current?.close();
-    wsRef.current = null;
+    socketRef.current?.disconnect();
+    socketRef.current = null;
   }, [clearTimer]);
 
   // ── Effects ────────────────────────────────────────────────────────────
@@ -464,7 +480,7 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
   useEffect(() => {
     return () => {
       clearTimer();
-      wsRef.current?.close();
+      socketRef.current?.disconnect();
     };
   }, [clearTimer]);
 

@@ -12,17 +12,18 @@ interface TutorChatProps {
   questionText: string;
   playerAnswer: string;
   correctAnswer: string;
+  roomPin: string;
+  playerId: string;
   onClose: () => void;
 }
 
-export function TutorChat({ questionText, playerAnswer, correctAnswer, onClose }: TutorChatProps) {
+export function TutorChat({ questionText, playerAnswer, correctAnswer, roomPin, playerId, onClose }: TutorChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   // Strands session ID — persisted across turns so the agent remembers context
   const [sessionId, setSessionId] = useState<string>('');
   const bottomRef = useRef<HTMLDivElement>(null);
-  const { user } = useAuth();
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -39,14 +40,14 @@ export function TutorChat({ questionText, playerAnswer, correctAnswer, onClose }
     setIsLoading(true);
 
     try {
-      const token = user ? await user.getIdToken() : '';
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/tutor/explain`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
         body: JSON.stringify({
+          roomPin,
+          playerId,
           questionText,
           playerAnswer,
           correctAnswer,

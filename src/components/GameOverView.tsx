@@ -382,6 +382,8 @@ export function GameOverView({ players, playerId, session, isHost, hostFileName 
               questionText={hardestQuestion.text}
               playerAnswer={hardestQuestion.options[0]}
               correctAnswer={hardestQuestion.options[hardestQuestion.correctIndex]}
+              roomPin={session?.roomPin || 'MOCK_TEST_ROOM'}
+              playerId={playerId}
               onClose={() => setShowTutor(false)}
             />
           )}
