@@ -1,6 +1,5 @@
-strands-agents
+strands-agents[gemini]
 strands-agents-tools
-google-genai
 fastapi
 uvicorn[standard]
 python-dotenv

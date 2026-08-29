@@ -48,7 +48,7 @@ def make_gemini_model(temperature: float = 0.7) -> GeminiModel:
     return GeminiModel(
         model_id="gemini-2.5-flash",
         client_args={"api_key": GEMINI_API_KEY},
-        temperature=temperature,
+        params={"temperature": temperature},
     )
 
 # ---------------------------------------------------------------------------
