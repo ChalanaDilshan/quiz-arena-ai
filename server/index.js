@@ -81,7 +81,7 @@ const PORT = process.env.PORT || 3001;
 
 // --- POST-GAME TUTOR ENDPOINT ---
 // Accepts a question + wrong answer and returns a multi-turn AI explanation
-app.post('/api/tutor/explain', apiLimiter, async (req, res) => {
+app.post('/api/tutor/explain', requireAgentAuth, apiLimiter, async (req, res) => {
   const { questionText, playerAnswer, correctAnswer, history } = req.body;
 
   if (!questionText || !correctAnswer) {

@@ -48,7 +48,10 @@ export function TutorChat({ questionText, playerAnswer, correctAnswer, onClose }
     try {
       const res = await fetch('http://localhost:3001/api/tutor/explain', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-agent-api-key': import.meta.env.VITE_AGENT_API_KEY || ''
+        },
         body: JSON.stringify({
           questionText,
           playerAnswer,
@@ -56,6 +59,17 @@ export function TutorChat({ questionText, playerAnswer, correctAnswer, onClose }
           history: geminiHistory,
         }),
       });
+
+      if (res.status === 429) {
+        setMessages(prev => [
+          ...prev,
+          ...(userInput ? [{ role: 'user' as const, text: userInput }] : []),
+          { role: 'model', text: "I'm currently helping too many students (API Rate Limit reached). Please give me 30 seconds to catch my breath and ask me again!" },
+        ]);
+        return;
+      }
+
+      if (!res.ok) throw new Error('API Error');
 
       const data = await res.json();
       if (data.explanation) {
