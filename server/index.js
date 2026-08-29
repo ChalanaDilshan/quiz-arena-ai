@@ -161,8 +161,8 @@ app.post('/api/agent/clear', requireAgentAuth, async (req, res) => {
   }
 });
 
-// --- Post-game Tutor Agent (public, rate-limited) ---
-app.post('/api/tutor/explain', apiLimiter, async (req, res) => {
+// --- Post-game Tutor Agent (public, rate-limited, but authenticated via Firebase) ---
+app.post('/api/tutor/explain', requireAgentAuth, apiLimiter, async (req, res) => {
   const { questionText, playerAnswer, correctAnswer, sessionId, followUp } = req.body;
 
   if (!questionText || typeof questionText !== 'string' || questionText.length > 500 || !correctAnswer) {
