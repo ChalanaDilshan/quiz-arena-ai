@@ -25,7 +25,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from strands import Agent
-from strands.models.google import GoogleModel
+from strands.models.gemini import GeminiModel
 from strands.tools import tool
 
 # ---------------------------------------------------------------------------
@@ -43,12 +43,12 @@ QUIZZES_DIR  = Path(__file__).parent.parent / "quizzes"
 SYLLABI_DIR.mkdir(exist_ok=True)
 QUIZZES_DIR.mkdir(exist_ok=True)
 
-def make_gemini_model(temperature: float = 0.7) -> GoogleModel:
-    """Return a Strands GoogleModel backed by Gemini 2.5 Flash."""
-    return GoogleModel(
+def make_gemini_model(temperature: float = 0.7) -> GeminiModel:
+    """Return a Strands GeminiModel backed by Gemini 2.5 Flash."""
+    return GeminiModel(
         model_id="gemini-2.5-flash",
-        api_key=GEMINI_API_KEY,
-        params={"temperature": temperature},
+        client_args={"api_key": GEMINI_API_KEY},
+        temperature=temperature,
     )
 
 # ---------------------------------------------------------------------------
@@ -133,7 +133,7 @@ def build_tutor_agent(history: list[dict] | None = None) -> Agent:
         model=make_gemini_model(temperature=0.7),
         system_prompt=TUTOR_PROMPT,
         # Pass prior conversation history so Strands maintains context
-        conversation_history=history or [],
+        messages=history or [],
     )
 
 
@@ -327,7 +327,7 @@ async def tutor(req: TutorRequest):
     result = agent(prompt)
 
     # Persist updated conversation history for this session
-    _tutor_sessions[session_id] = agent.conversation_history
+    _tutor_sessions[session_id] = agent.messages
 
     return {"explanation": str(result), "session_id": session_id}
 
