@@ -88,6 +88,13 @@ io.on('connection', (socket) => {
   console.log('Socket connected:', socket.id);
 
   socket.on('hostGame', ({ quizData, pin }) => {
+    // Clear any pending cleanup if room pin is reused
+    const existingRoom = rooms.get(pin);
+    if (existingRoom && existingRoom.cleanupTimeout) {
+      clearTimeout(existingRoom.cleanupTimeout);
+      if (existingRoom.timerInterval) clearInterval(existingRoom.timerInterval);
+    }
+
     rooms.set(pin, {
       hostSocket: socket.id,
       players: [{ id: socket.id, nickname: 'Host', isHost: true, score: 0, streak: 0, wrongStreak: 0 }],
@@ -96,7 +103,8 @@ io.on('connection', (socket) => {
       currentQuestionIndex: 0,
       state: 'LOBBY',
       timeRemaining: 20,
-      timerInterval: null
+      timerInterval: null,
+      cleanupTimeout: null
     });
     socket.join(pin);
     broadcastState(pin);
@@ -195,7 +203,19 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    // Basic cleanup logic could go here, but for now we rely on explicit GAME_OVER
+    // Cleanup zombie rooms to prevent memory leaks if host disconnects
+    for (const [pin, room] of rooms.entries()) {
+      if (room.hostSocket === socket.id) {
+        room.cleanupTimeout = setTimeout(() => {
+          const r = rooms.get(pin);
+          if (r && r.hostSocket === socket.id) { // Ensure it's still the same room instance
+            if (r.timerInterval) clearInterval(r.timerInterval);
+            rooms.delete(pin);
+            console.log(`[Cleanup] Room ${pin} destroyed due to host inactivity.`);
+          }
+        }, 5 * 60 * 1000); // 5 minutes
+      }
+    }
   });
 });
 

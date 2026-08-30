@@ -80,11 +80,25 @@ export function HomeView({ onJoinGame, onHostGame, onHostSavedQuiz, uploadProgre
   const handleDrop = (e: DragEvent) => {
     e.preventDefault(); setIsDragging(false);
     const f = e.dataTransfer.files[0];
-    if (f?.type === 'application/pdf') setSelectedFile(f);
+    if (f) {
+      if (f.type === 'application/pdf' && f.name.toLowerCase().endsWith('.pdf')) {
+        setSelectedFile(f);
+        setError(null);
+      } else {
+        setError('Only PDF files are allowed.');
+      }
+    }
   };
   const handleFileSelect = (e: ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
-    if (f?.type === 'application/pdf') setSelectedFile(f);
+    if (f) {
+      if (f.type === 'application/pdf' && f.name.toLowerCase().endsWith('.pdf')) {
+        setSelectedFile(f);
+        setError(null);
+      } else {
+        setError('Only PDF files are allowed.');
+      }
+    }
   };
 
   const adjustQ = (d: number) => setNumQuestions(q => Math.min(MAX_Q, Math.max(MIN_Q, q + d)));

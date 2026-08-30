@@ -69,7 +69,7 @@ function generateId(): string {
 // ─── Return type ────────────────────────────────────────────────────────────
 
 export interface UseQuizGameReturn {
-  // State
+  isMockMode: boolean;
   gameState: GameState;
   session: QuizSession | null;
   currentQuestion: Question | null;
