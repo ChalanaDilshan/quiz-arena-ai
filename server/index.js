@@ -225,11 +225,13 @@ const requireValidRoom = (req, res, next) => {
 
   // Handle Mock Mode bypass strictly
   if (roomPin === 'MOCK_TEST_ROOM') {
-    const isValidMock = MOCK_QUESTIONS.some(
-      q => q.text === questionText && q.correctAnswer === correctAnswer
-    );
-    if (isValidMock) return next();
-    return res.status(403).json({ error: 'Invalid mock question payload' });
+    if (questionText && correctAnswer) {
+      const isValidMock = MOCK_QUESTIONS.some(
+        q => q.text === questionText && q.correctAnswer === correctAnswer
+      );
+      if (!isValidMock) return res.status(403).json({ error: 'Invalid mock question payload' });
+    }
+    return next();
   }
 
   const room = rooms.get(roomPin) || recentRooms.get(roomPin);
@@ -237,12 +239,15 @@ const requireValidRoom = (req, res, next) => {
     return res.status(403).json({ error: 'Invalid or expired room' });
   }
 
-  const validQuestion = room.questions.some(q => 
-    q.text === questionText && q.options[q.correctIndex] === correctAnswer
-  );
+  // Only validate question context if it's provided (e.g., Tutor API)
+  if (questionText && correctAnswer) {
+    const validQuestion = room.questions.some(q => 
+      q.text === questionText && q.options[q.correctIndex] === correctAnswer
+    );
 
-  if (!validQuestion) {
-    return res.status(403).json({ error: 'Question not found in specified room' });
+    if (!validQuestion) {
+      return res.status(403).json({ error: 'Question not found in specified room' });
+    }
   }
 
   next();
