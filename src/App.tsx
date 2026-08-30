@@ -67,21 +67,22 @@ function App() {
     if (game.gameState === 'LEADERBOARD') {
       const players = game.players.filter(p => !p.isHost);
       
-      // Look for a player on a hot streak (>= 2 correct)
-      const hotPlayer = players.find(p => p.streak >= 2);
-      // Look for a player on a cold streak (>= 2 wrong)
-      const coldPlayer = players.find(p => (p.wrongStreak ?? 0) >= 2);
+      // Only look at the human player to avoid spamming the API with bot streaks
+      const humanPlayer = players.find(p => p.id === game.playerId);
+      
+      const hotPlayer = humanPlayer && humanPlayer.streak >= 2 ? humanPlayer : undefined;
+      const coldPlayer = humanPlayer && (humanPlayer.wrongStreak ?? 0) >= 2 ? humanPlayer : undefined;
 
       if (hotPlayer) {
         commentator.triggerCommentary('HOT_STREAK', {
           nickname: hotPlayer.nickname,
           streak: hotPlayer.streak,
-        });
+        }, game.isMockMode ? 'MOCK_TEST_ROOM' : (game.session?.roomPin || 'MOCK_TEST_ROOM'));
       } else if (coldPlayer) {
         commentator.triggerCommentary('COLD_STREAK', {
           nickname: coldPlayer.nickname,
           wrongStreak: coldPlayer.wrongStreak,
-        });
+        }, game.isMockMode ? 'MOCK_TEST_ROOM' : (game.session?.roomPin || 'MOCK_TEST_ROOM'));
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -152,6 +153,7 @@ function App() {
             playerId={game.playerId}
             session={game.session}
             isHost={game.isHost}
+            isMockMode={game.isMockMode}
             hostFileName={hostFileName}
             onRestart={() => { game.resetGame(); setShowLanding(true); }}
           />

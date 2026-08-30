@@ -13,7 +13,7 @@ export function useCommentator() {
     isVisible: false,
   });
 
-  const triggerCommentary = useCallback(async (eventType: string, data: any) => {
+  const triggerCommentary = useCallback(async (eventType: string, data: any, roomPin: string = 'MOCK_TEST_ROOM') => {
     // Show typing indicator
     setState((prev) => ({ ...prev, isVisible: true, isTyping: true, currentComment: null }));
 
@@ -23,7 +23,7 @@ export function useCommentator() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ eventType, data }),
+        body: JSON.stringify({ eventType, data, roomPin }),
       });
 
       if (!response.ok) {

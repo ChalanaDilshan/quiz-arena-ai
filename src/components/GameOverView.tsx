@@ -17,6 +17,7 @@ interface GameOverViewProps {
   playerId: string;
   session?: QuizSession | null;
   isHost?: boolean;
+  isMockMode?: boolean;
   hostFileName?: string;
   onRestart: () => void;
 }
@@ -28,7 +29,7 @@ const PODIUM = [
   { rank: 2, label: '3rd', blockH: 'h-16 sm:h-20', delay: 0.60 },
 ];
 
-export function GameOverView({ players, playerId, session, isHost, hostFileName = '', onRestart }: GameOverViewProps) {
+export function GameOverView({ players, playerId, session, isHost, isMockMode, hostFileName = '', onRestart }: GameOverViewProps) {
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [savedToHistory, setSavedToHistory] = useState(false);
   const [showTutor, setShowTutor] = useState(false);
@@ -382,7 +383,7 @@ export function GameOverView({ players, playerId, session, isHost, hostFileName 
               questionText={hardestQuestion.text}
               playerAnswer={hardestQuestion.options[0]}
               correctAnswer={hardestQuestion.options[hardestQuestion.correctIndex]}
-              roomPin={session?.roomPin || 'MOCK_TEST_ROOM'}
+              roomPin={isMockMode ? 'MOCK_TEST_ROOM' : (session?.roomPin || 'MOCK_TEST_ROOM')}
               playerId={playerId}
               onClose={() => setShowTutor(false)}
             />

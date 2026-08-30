@@ -487,6 +487,7 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
   // ── Public interface ───────────────────────────────────────────────────
 
   return {
+    isMockMode: useMockMode,
     gameState,
     session,
     currentQuestion,
