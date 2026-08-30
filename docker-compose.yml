@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  strands-service:
+    build:
+      context: ./server/strands_agents
+      dockerfile: Dockerfile.strands
+    ports:
+      - "8001:8001"
+    env_file:
+      - ./server/.env
+    volumes:
+      - ./server/syllabi:/app/syllabi
+      - ./server/quizzes:/app/quizzes
+      # Ensures the service account key is available if Strands uses Firebase in the future
+      - ./server/serviceAccountKey.json:/app/serviceAccountKey.json
+
+  gateway:
+    build:
+      context: ./server
+      dockerfile: Dockerfile.gateway
+    ports:
+      - "3001:3001"
+    depends_on:
+      - strands-service
+    env_file:
+      - .env
+    environment:
+      # Instruct the Node.js gateway to route to the Python container via Docker DNS
+      - STRANDS_URL=http://strands-service:8001
+    volumes:
+      - ./server/serviceAccountKey.json:/app/serviceAccountKey.json
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        # For local testing, we point the frontend to the local machine's exposed port 3001
+        - VITE_API_URL=http://localhost:3001
+    ports:
+      - "80:80"
+    depends_on:
+      - gateway
