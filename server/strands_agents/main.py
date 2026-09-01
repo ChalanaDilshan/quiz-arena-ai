@@ -19,6 +19,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+import boto3
 import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
@@ -38,10 +39,14 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
     raise RuntimeError("GEMINI_API_KEY not set in server/.env")
 
+AWS_S3_BUCKET_NAME = os.environ.get("AWS_S3_BUCKET_NAME")
+s3_client = boto3.client("s3") if AWS_S3_BUCKET_NAME else None
+
 SYLLABI_DIR  = Path(__file__).parent.parent / "syllabi"
 QUIZZES_DIR  = Path(__file__).parent.parent / "quizzes"
-SYLLABI_DIR.mkdir(exist_ok=True)
-QUIZZES_DIR.mkdir(exist_ok=True)
+if not AWS_S3_BUCKET_NAME:
+    SYLLABI_DIR.mkdir(exist_ok=True)
+    QUIZZES_DIR.mkdir(exist_ok=True)
 
 def make_gemini_model(temperature: float = 0.7) -> GeminiModel:
     """Return a Strands GeminiModel backed by Gemini 2.5 Flash."""
@@ -168,7 +173,11 @@ def list_syllabus_files() -> str:
     Returns:
         A JSON array of filenames, e.g. ["week1.txt", "week2.txt"]
     """
-    files = [f.name for f in SYLLABI_DIR.glob("*.txt")]
+    if AWS_S3_BUCKET_NAME:
+        response = s3_client.list_objects_v2(Bucket=AWS_S3_BUCKET_NAME, Prefix="syllabi/")
+        files = [obj["Key"].split("/")[-1] for obj in response.get("Contents", []) if obj["Key"].endswith(".txt")]
+    else:
+        files = [f.name for f in SYLLABI_DIR.glob("*.txt")]
     return json.dumps(files)
 
 
@@ -185,10 +194,19 @@ def read_syllabus_file(filename: str) -> str:
     """
     # Path-traversal protection: only allow plain filenames, no slashes
     safe_name = Path(filename).name
-    target = SYLLABI_DIR / safe_name
-    if not target.exists() or not target.suffix == ".txt":
-        return f"Error: file '{safe_name}' not found in syllabi directory."
-    raw = target.read_text(encoding="utf-8")
+    if AWS_S3_BUCKET_NAME:
+        if not safe_name.endswith(".txt"):
+            return f"Error: file '{safe_name}' not found in syllabi directory."
+        try:
+            response = s3_client.get_object(Bucket=AWS_S3_BUCKET_NAME, Key=f"syllabi/{safe_name}")
+            raw = response["Body"].read().decode("utf-8")
+        except Exception:
+            return f"Error: file '{safe_name}' not found in S3 syllabi directory or could not be read."
+    else:
+        target = SYLLABI_DIR / safe_name
+        if not target.exists() or not target.suffix == ".txt":
+            return f"Error: file '{safe_name}' not found in syllabi directory."
+        raw = target.read_text(encoding="utf-8")
     # Strip control chars and cap size
     clean = re.sub(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]", "", raw)[:8000]
     return clean
@@ -203,12 +221,24 @@ def list_existing_quizzes() -> str:
         A JSON array of quiz metadata objects with 'filename' and 'topic' keys.
     """
     quizzes = []
-    for f in QUIZZES_DIR.glob("*.json"):
-        try:
-            data = json.loads(f.read_text(encoding="utf-8"))
-            quizzes.append({"filename": f.name, "topic": data.get("topic", "unknown")})
-        except Exception:
-            quizzes.append({"filename": f.name, "topic": "unreadable"})
+    if AWS_S3_BUCKET_NAME:
+        response = s3_client.list_objects_v2(Bucket=AWS_S3_BUCKET_NAME, Prefix="quizzes/")
+        for obj in response.get("Contents", []):
+            if not obj["Key"].endswith(".json"):
+                continue
+            try:
+                file_obj = s3_client.get_object(Bucket=AWS_S3_BUCKET_NAME, Key=obj["Key"])
+                data = json.loads(file_obj["Body"].read().decode("utf-8"))
+                quizzes.append({"filename": obj["Key"].split("/")[-1], "topic": data.get("topic", "unknown")})
+            except Exception:
+                quizzes.append({"filename": obj["Key"].split("/")[-1], "topic": "unreadable"})
+    else:
+        for f in QUIZZES_DIR.glob("*.json"):
+            try:
+                data = json.loads(f.read_text(encoding="utf-8"))
+                quizzes.append({"filename": f.name, "topic": data.get("topic", "unknown")})
+            except Exception:
+                quizzes.append({"filename": f.name, "topic": "unreadable"})
     return json.dumps(quizzes)
 
 
@@ -231,9 +261,18 @@ def save_quiz_draft(topic: str, questions_json: str) -> str:
 
     filename = f"quiz_{uuid.uuid4().hex[:8]}_{topic[:30].replace(' ', '_')}.json"
     payload = {"topic": topic, "questions": questions, "status": "pending_approval"}
-    (QUIZZES_DIR / filename).write_text(
-        json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8"
-    )
+    payload_str = json.dumps(payload, indent=2, ensure_ascii=False)
+    
+    if AWS_S3_BUCKET_NAME:
+        s3_client.put_object(
+            Bucket=AWS_S3_BUCKET_NAME,
+            Key=f"quizzes/{filename}",
+            Body=payload_str.encode("utf-8"),
+            ContentType="application/json"
+        )
+    else:
+        (QUIZZES_DIR / filename).write_text(payload_str, encoding="utf-8")
+        
     return f"Quiz saved as '{filename}'. Awaiting human approval in the Admin Dashboard."
 
 
@@ -341,14 +380,26 @@ async def syllabus_trigger(_: SyllabusRequest = SyllabusRequest()):
     )
     # Look for the most recently saved quiz for the dashboard
     latest_quiz = None
-    if QUIZZES_DIR.exists():
-        files = sorted(QUIZZES_DIR.glob("*.json"), key=lambda f: f.stat().st_mtime, reverse=True)
-        if files:
-            try:
-                latest_quiz = json.loads(files[0].read_text(encoding="utf-8"))
-                latest_quiz["_filename"] = files[0].name
-            except Exception:
-                pass
+    if AWS_S3_BUCKET_NAME:
+        response = s3_client.list_objects_v2(Bucket=AWS_S3_BUCKET_NAME, Prefix="quizzes/")
+        if "Contents" in response:
+            files = sorted([obj for obj in response["Contents"] if obj["Key"].endswith(".json")], key=lambda x: x["LastModified"], reverse=True)
+            if files:
+                try:
+                    obj_resp = s3_client.get_object(Bucket=AWS_S3_BUCKET_NAME, Key=files[0]["Key"])
+                    latest_quiz = json.loads(obj_resp["Body"].read().decode("utf-8"))
+                    latest_quiz["_filename"] = files[0]["Key"].split("/")[-1]
+                except Exception:
+                    pass
+    else:
+        if QUIZZES_DIR.exists():
+            files = sorted(QUIZZES_DIR.glob("*.json"), key=lambda f: f.stat().st_mtime, reverse=True)
+            if files:
+                try:
+                    latest_quiz = json.loads(files[0].read_text(encoding="utf-8"))
+                    latest_quiz["_filename"] = files[0].name
+                except Exception:
+                    pass
 
     return {"agent_summary": str(result), "pending_quiz": latest_quiz}
 
@@ -356,16 +407,30 @@ async def syllabus_trigger(_: SyllabusRequest = SyllabusRequest()):
 @app.get("/syllabus/pending")
 async def syllabus_pending():
     """Return the most recently saved quiz draft (for Admin Dashboard polling)."""
-    if not QUIZZES_DIR.exists():
-        return {"pending_quiz": None}
-    files = sorted(QUIZZES_DIR.glob("*.json"), key=lambda f: f.stat().st_mtime, reverse=True)
-    for f in files:
-        try:
-            data = json.loads(f.read_text(encoding="utf-8"))
-            if data.get("status") == "pending_approval":
-                return {"pending_quiz": data.get("questions"), "filename": f.name}
-        except Exception:
-            continue
+    if AWS_S3_BUCKET_NAME:
+        response = s3_client.list_objects_v2(Bucket=AWS_S3_BUCKET_NAME, Prefix="quizzes/")
+        if "Contents" not in response:
+            return {"pending_quiz": None}
+        files = sorted([obj for obj in response["Contents"] if obj["Key"].endswith(".json")], key=lambda x: x["LastModified"], reverse=True)
+        for f in files:
+            try:
+                obj_resp = s3_client.get_object(Bucket=AWS_S3_BUCKET_NAME, Key=f["Key"])
+                data = json.loads(obj_resp["Body"].read().decode("utf-8"))
+                if data.get("status") == "pending_approval":
+                    return {"pending_quiz": data.get("questions"), "filename": f["Key"].split("/")[-1]}
+            except Exception:
+                continue
+    else:
+        if not QUIZZES_DIR.exists():
+            return {"pending_quiz": None}
+        files = sorted(QUIZZES_DIR.glob("*.json"), key=lambda f: f.stat().st_mtime, reverse=True)
+        for f in files:
+            try:
+                data = json.loads(f.read_text(encoding="utf-8"))
+                if data.get("status") == "pending_approval":
+                    return {"pending_quiz": data.get("questions"), "filename": f.name}
+            except Exception:
+                continue
     return {"pending_quiz": None}
 
 
@@ -374,12 +439,28 @@ async def syllabus_approve(body: dict):
     filename = body.get("filename")
     if not filename:
         raise HTTPException(status_code=400, detail="filename required")
-    target = QUIZZES_DIR / Path(filename).name
-    if not target.exists():
-        raise HTTPException(status_code=404, detail="Quiz file not found")
-    data = json.loads(target.read_text(encoding="utf-8"))
-    data["status"] = "approved"
-    target.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    safe_name = Path(filename).name
+    
+    if AWS_S3_BUCKET_NAME:
+        try:
+            obj_resp = s3_client.get_object(Bucket=AWS_S3_BUCKET_NAME, Key=f"quizzes/{safe_name}")
+            data = json.loads(obj_resp["Body"].read().decode("utf-8"))
+            data["status"] = "approved"
+            s3_client.put_object(
+                Bucket=AWS_S3_BUCKET_NAME,
+                Key=f"quizzes/{safe_name}",
+                Body=json.dumps(data, indent=2).encode("utf-8"),
+                ContentType="application/json"
+            )
+        except Exception:
+            raise HTTPException(status_code=404, detail="Quiz file not found in S3")
+    else:
+        target = QUIZZES_DIR / safe_name
+        if not target.exists():
+            raise HTTPException(status_code=404, detail="Quiz file not found")
+        data = json.loads(target.read_text(encoding="utf-8"))
+        data["status"] = "approved"
+        target.write_text(json.dumps(data, indent=2), encoding="utf-8")
     return {"success": True}
 
 
@@ -387,9 +468,16 @@ async def syllabus_approve(body: dict):
 async def syllabus_clear(body: dict = {}):
     filename = body.get("filename")
     if filename:
-        target = QUIZZES_DIR / Path(filename).name
-        if target.exists():
-            target.unlink()
+        safe_name = Path(filename).name
+        if AWS_S3_BUCKET_NAME:
+            try:
+                s3_client.delete_object(Bucket=AWS_S3_BUCKET_NAME, Key=f"quizzes/{safe_name}")
+            except Exception:
+                pass
+        else:
+            target = QUIZZES_DIR / safe_name
+            if target.exists():
+                target.unlink()
     return {"success": True}
 
 
