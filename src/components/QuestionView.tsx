@@ -3,6 +3,7 @@ import { Clock, Check, X, Zap } from 'lucide-react';
 import { useEffect } from 'react';
 import type { Question } from '../types';
 import { playCorrectSound, playWrongSound } from '../utils/sounds';
+import { HintBubble } from './HintBubble';
 
 interface QuestionViewProps {
   question: Question;
@@ -13,6 +14,11 @@ interface QuestionViewProps {
   isAnswerRevealed: boolean;
   streak: number;
   onSubmitAnswer: (index: number) => void;
+  // Hint Master
+  hint: string | null;
+  hintLoading: boolean;
+  hintUsed: boolean;
+  onRequestHint: () => void;
 }
 
 // Answer pads — vivid fills; these stay the same in both themes
@@ -28,6 +34,7 @@ type PadState = 'default' | 'selected' | 'correct' | 'incorrect' | 'dimmed';
 export function QuestionView({
   question, questionNumber, totalQuestions,
   timeRemaining, selectedAnswer, isAnswerRevealed, streak, onSubmitAnswer,
+  hint, hintLoading, hintUsed, onRequestHint,
 }: QuestionViewProps) {
   const progress = timeRemaining / question.timeLimit;
   const timerColor = progress > 0.5 ? 'var(--color-sienna)' : progress > 0.25 ? '#E67E22' : '#C0392B';
@@ -82,6 +89,15 @@ export function QuestionView({
         className="card rounded-2xl px-6 py-8 mb-5 text-center">
         <h2 className="text-xl sm:text-2xl font-bold text-alabaster leading-relaxed">{question.text}</h2>
       </motion.div>
+
+      {/* Hint Master bubble */}
+      <HintBubble
+        hintUsed={hintUsed}
+        hintLoading={hintLoading}
+        hint={hint}
+        disabled={selectedAnswer !== null || isAnswerRevealed}
+        onRequestHint={onRequestHint}
+      />
 
       {/* 2×2 Answer grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 flex-1 mb-6">

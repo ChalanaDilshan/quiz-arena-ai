@@ -133,8 +133,13 @@ function App() {
             isAnswerRevealed={game.isAnswerRevealed}
             streak={game.players.find(p => p.id === game.playerId)?.streak ?? 0}
             onSubmitAnswer={game.submitAnswer}
+            hint={game.hint}
+            hintLoading={game.hintLoading}
+            hintUsed={game.hintUsed}
+            onRequestHint={game.requestHint}
           />
         ) : null;
+
       case 'LEADERBOARD':
         return (
           <LeaderboardView

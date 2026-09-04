@@ -82,6 +82,11 @@ export interface UseQuizGameReturn {
   playerId: string;
   error: string | null;
 
+  // Hint Master
+  hint: string | null;
+  hintLoading: boolean;
+  hintUsed: boolean;
+
   // Actions
   joinGame: (pin: string, nickname: string) => void;
   hostGame: (file: File, numQuestions: number, difficulty: string) => void;
@@ -90,6 +95,7 @@ export interface UseQuizGameReturn {
   submitAnswer: (answerIndex: number) => void;
   nextQuestion: () => void;
   resetGame: () => void;
+  requestHint: () => void;
 }
 
 // ─── Hook ───────────────────────────────────────────────────────────────────
@@ -104,6 +110,11 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [playerId] = useState(() => generateId());
   const [error, setError] = useState<string | null>(null);
+
+  // Hint Master state
+  const [hint, setHint] = useState<string | null>(null);
+  const [hintLoading, setHintLoading] = useState(false);
+  const [hintUsed, setHintUsed] = useState(false);
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const socketRef = useRef<Socket | null>(null);
@@ -455,9 +466,46 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
     setIsHost(false);
     setUploadProgress(0);
     setError(null);
+    setHint(null);
+    setHintUsed(false);
+    setHintLoading(false);
     socketRef.current?.disconnect();
     socketRef.current = null;
   }, [clearTimer]);
+
+  // ── Hint Master ────────────────────────────────────────────────────────
+
+  const requestHint = useCallback(async () => {
+    if (!currentQuestion || hintUsed || hintLoading || selectedAnswer !== null || isAnswerRevealed) return;
+
+    setHintUsed(true);
+    setHintLoading(true);
+    setHint(null);
+
+    const roomPin = session?.roomPin ?? 'MOCK_TEST_ROOM';
+    const questionIndex = session?.currentQuestionIndex ?? 0;
+    const url = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
+    try {
+      const res = await fetch(`${url}/api/hint`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          roomPin,
+          playerId,
+          questionIndex,
+          questionText: currentQuestion.text,
+          options: currentQuestion.options,
+        }),
+      });
+      const data = await res.json();
+      setHint(data.hint ?? 'The Hint Master is speechless… trust your instincts!');
+    } catch {
+      setHint('Hint unavailable right now. Trust your gut!');
+    } finally {
+      setHintLoading(false);
+    }
+  }, [currentQuestion, hintUsed, hintLoading, selectedAnswer, isAnswerRevealed, session, playerId]);
 
   // ── Effects ────────────────────────────────────────────────────────────
 
@@ -475,6 +523,13 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
 
     return () => clearTimeout(timeout);
   }, [gameState, isAnswerRevealed, useMockMode, simulateMockAnswers]);
+
+  // Reset hint state when the question changes
+  useEffect(() => {
+    setHint(null);
+    setHintUsed(false);
+    setHintLoading(false);
+  }, [session?.currentQuestionIndex]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -499,6 +554,9 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
     uploadProgress,
     playerId,
     error,
+    hint,
+    hintLoading,
+    hintUsed,
     joinGame,
     hostGame,
     hostSavedQuiz,
@@ -506,5 +564,6 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
     submitAnswer,
     nextQuestion,
     resetGame,
+    requestHint,
   };
 }

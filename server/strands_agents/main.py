@@ -1,7 +1,7 @@
 """
 Quiz Arena — Strands Agents Microservice
 =========================================
-Three real Strands agents exposed over FastAPI, called internally
+Four real Strands agents exposed over FastAPI, called internally
 by the Node.js Express gateway.
 
 Agents:
@@ -10,6 +10,7 @@ Agents:
   3. SyllabusAgent     — autonomous background agent with real tools:
                           list_syllabus_files, read_syllabus_file,
                           list_existing_quizzes, save_quiz_draft
+  4. HintMasterAgent   — gives a subtle, non-spoiler hint for a live question
 """
 
 import json
@@ -285,10 +286,60 @@ def build_syllabus_agent() -> Agent:
 
 
 # ===========================================================================
+# Agent 4 — Hint Master (live in-game subtle clue provider)
+# ===========================================================================
+
+HINT_MASTER_PROMPT = """
+You are the "Hint Master", a cryptic but helpful assistant embedded inside
+a live quiz competition called Quiz Arena.
+
+A player is stuck on a multiple-choice question and has asked for a hint.
+Your ONLY job is to call the analyze_question tool first, then craft ONE
+subtle, Socratic hint that nudges the player toward the correct answer
+without EVER revealing it directly.
+
+Strict rules:
+- DO NOT mention the correct answer or its label (A, B, C, D).
+- DO NOT say things like "think about the second option" or "it starts with M".
+- Use an analogy, a real-world fact, or a leading question as your clue.
+- Keep it to 1-2 punchy sentences. Be clever, not boring.
+- Your tone should feel like a wise game-show host, not a teacher.
+""".strip()
+
+
+@tool
+def analyze_question(question_text: str, options: str) -> str:
+    """
+    Receive the full quiz question and its four answer options so the
+    Hint Master can study the content before crafting a subtle clue.
+
+    Args:
+        question_text: The full text of the quiz question.
+        options: A JSON array string of the four answer options.
+
+    Returns:
+        A structured summary of the question context for the agent.
+    """
+    return (
+        f"QUESTION: {question_text}\n"
+        f"OPTIONS: {options}\n"
+        f"Now craft a subtle, non-spoiler hint for the player."
+    )
+
+
+def build_hint_master_agent() -> Agent:
+    return Agent(
+        model=make_gemini_model(temperature=0.75),
+        system_prompt=HINT_MASTER_PROMPT,
+        tools=[analyze_question],
+    )
+
+
+# ===========================================================================
 # FastAPI app
 # ===========================================================================
 
-app = FastAPI(title="Quiz Arena — Strands Agents Service", version="1.0.0")
+app = FastAPI(title="Quiz Arena — Strands Agents Service", version="1.1.0")
 
 # Only accept calls from the Node.js gateway (localhost)
 app.add_middleware(
@@ -317,6 +368,11 @@ class TutorRequest(BaseModel):
 
 class SyllabusRequest(BaseModel):
     pass  # fully autonomous — no input needed
+
+
+class HintRequest(BaseModel):
+    question_text: str
+    options: list[str]  # exactly 4 option strings
 
 
 # --- Endpoints ---
@@ -481,9 +537,28 @@ async def syllabus_clear(body: dict = {}):
     return {"success": True}
 
 
+# --- Hint Master ---
+
+@app.post("/hint")
+async def hint(req: HintRequest):
+    safe_question = sanitize(req.question_text, 500)
+    safe_options  = [sanitize(opt, 120) for opt in req.options[:4]]
+
+    agent  = build_hint_master_agent()
+    import json as _json
+    prompt = (
+        f"A player is stuck. Call analyze_question with "
+        f"question_text='{safe_question}' and "
+        f"options='{_json.dumps(safe_options)}'. "
+        f"Then deliver your single cryptic hint."
+    )
+    result = agent(prompt)
+    return {"hint": str(result)}
+
+
 @app.get("/health")
 async def health():
-    return {"status": "ok", "agents": ["commentator", "tutor", "syllabus"]}
+    return {"status": "ok", "agents": ["commentator", "tutor", "syllabus", "hint_master"]}
 
 
 if __name__ == "__main__":

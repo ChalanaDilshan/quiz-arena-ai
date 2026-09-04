@@ -51,7 +51,10 @@ const apiLimiter = rateLimit({
 // pin -> { hostSocket, players: [{id, nickname, score, streak, ...}], questions, currentQuestionIndex, state }
 const rooms = new Map();
 // pin -> { questions } (for tutor fallback after game ends)
-const recentRooms = new Map(); 
+const recentRooms = new Map();
+
+// Track hint usage: "pin:playerId:questionIndex" -> true (one hint per question)
+const hintUsage = new Set(); 
 
 // Mock Questions for bypass testing
 const MOCK_QUESTIONS = [
@@ -381,6 +384,37 @@ app.post('/api/tutor/explain', apiLimiter, requireValidRoom, async (req, res) =>
   } catch (err) {
     if (err.status === 429) return res.status(429).json({ error: 'Rate limit exceeded' });
     res.status(500).json({ error: 'Tutor agent failed to respond.' });
+  }
+});
+
+// --- Hint Master Agent ---
+app.post('/api/hint', apiLimiter, requireValidRoom, async (req, res) => {
+  const { roomPin, playerId, questionIndex, questionText, options } = req.body;
+
+  if (!questionText || typeof questionText !== 'string' || questionText.length > 500) {
+    return res.status(400).json({ error: 'Invalid question payload' });
+  }
+  if (!Array.isArray(options) || options.length < 2) {
+    return res.status(400).json({ error: 'options must be an array of answer strings' });
+  }
+
+  // Enforce one hint per player per question
+  const hintKey = `${roomPin}:${playerId}:${questionIndex}`;
+  if (hintUsage.has(hintKey)) {
+    return res.status(429).json({ error: 'Hint already used for this question' });
+  }
+  hintUsage.add(hintKey);
+  // Auto-clean after 5 minutes so the Set doesn't grow forever
+  setTimeout(() => hintUsage.delete(hintKey), 5 * 60 * 1000);
+
+  try {
+    const result = await callStrands('/hint', {
+      question_text: questionText,
+      options: options.slice(0, 4).map(o => String(o).substring(0, 120)),
+    });
+    res.json({ hint: result.hint });
+  } catch (err) {
+    res.status(500).json({ error: 'Hint agent failed to respond.' });
   }
 });
 
