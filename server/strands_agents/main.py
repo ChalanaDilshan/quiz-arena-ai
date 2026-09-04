@@ -341,11 +341,20 @@ def build_hint_master_agent() -> Agent:
 
 app = FastAPI(title="Quiz Arena — Strands Agents Service", version="1.1.0")
 
-# Only accept calls from the Node.js gateway (localhost)
+# Configure allowed origins from environment variable (supporting Docker, local, and production origins)
+raw_origins = os.environ.get(
+    "STRANDS_ALLOWED_ORIGINS",
+    os.environ.get("ALLOWED_ORIGINS", "http://localhost:3001,http://127.0.0.1:3001,http://gateway:3001")
+)
+allowed_origins = [o.strip() for o in raw_origins.split(",") if o.strip()]
+if "*" in allowed_origins:
+    allowed_origins = ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3001"],
-    allow_methods=["POST"],
+    allow_origins=allowed_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 

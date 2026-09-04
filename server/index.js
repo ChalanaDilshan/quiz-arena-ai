@@ -65,6 +65,20 @@ const MOCK_QUESTIONS = [
   { text: 'Which programming language was created by Brendan Eich in 1995?', correctAnswer: 'JavaScript' },
 ];
 
+const MAX_PLAYERS_PER_ROOM = 50;
+
+function sanitizeNickname(raw) {
+  if (typeof raw !== 'string') return null;
+  const trimmed = raw.trim();
+  if (trimmed.length < 1 || trimmed.length > 24) return null;
+  // Strip control characters and HTML/injection characters
+  const clean = trimmed
+    .replace(/[\x00-\x1F\x7F]/g, '')
+    .replace(/[<>"'`]/g, '')
+    .trim();
+  return clean.length >= 1 && clean.length <= 24 ? clean : null;
+}
+
 function sanitizeQuestion(q) {
   if (!q) return null;
   return {
@@ -149,6 +163,18 @@ io.on('connection', (socket) => {
       socket.emit('error', 'Room not found or game already started');
       return;
     }
+
+    const cleanNickname = sanitizeNickname(nickname);
+    if (!cleanNickname) {
+      socket.emit('error', 'Invalid nickname. Must be 1-24 valid characters without HTML or control characters.');
+      return;
+    }
+
+    if (playerId && (typeof playerId !== 'string' || playerId.length > 64 || !/^[\w-]+$/.test(playerId))) {
+      socket.emit('error', 'Invalid player ID format.');
+      return;
+    }
+
     const actualPlayerId = playerId || socket.id;
     const existingPlayer = room.players.find(p => p.id === actualPlayerId);
 
@@ -160,11 +186,17 @@ io.on('connection', (socket) => {
       }
       // Re-bind to current socket if reconnecting
       existingPlayer.socketId = socket.id;
+      existingPlayer.nickname = cleanNickname;
     } else {
+      if (room.players.length >= MAX_PLAYERS_PER_ROOM) {
+        socket.emit('error', `Room is full (maximum ${MAX_PLAYERS_PER_ROOM} players reached).`);
+        return;
+      }
+
       room.players.push({
         id: actualPlayerId,
         socketId: socket.id,
-        nickname: String(nickname || 'Player').slice(0, 30),
+        nickname: cleanNickname,
         isHost: false,
         score: 0,
         streak: 0,
