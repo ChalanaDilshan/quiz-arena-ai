@@ -63,7 +63,10 @@ function generatePin(): string {
 }
 
 function generateId(): string {
-  return Math.random().toString(36).substring(2, 9);
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 }
 
 // ─── Return type ────────────────────────────────────────────────────────────
@@ -208,23 +211,27 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
     socket.on('gameStateUpdate', (state) => {
       setGameState(state.state);
       setSession(prev => {
-        const questions = prev?.questions || [];
-        if (state.currentQuestion && state.state === 'QUESTION') {
-          questions[state.currentQuestionIndex] = state.currentQuestion;
+        let questions = prev?.questions ? [...prev.questions] : [];
+        if (state.questions && state.state === 'GAME_OVER') {
+          questions = state.questions;
+        } else if (state.currentQuestion) {
+          questions[state.currentQuestionIndex] = {
+            ...(questions[state.currentQuestionIndex] || {}),
+            ...state.currentQuestion,
+          };
         }
         return {
           roomPin: pin,
           hostId: prev?.hostId || '',
           currentQuestionIndex: state.currentQuestionIndex,
           players: state.players,
-          questions: prev?.questions || [],
+          questions,
           gameState: state.state
         };
       });
       setTimeRemaining(state.timeRemaining);
       
       if (state.state === 'QUESTION') {
-        // Only clear selected answer if it's a fresh question start
         setIsAnswerRevealed(false);
       }
       if (state.state === 'LEADERBOARD' || state.state === 'GAME_OVER') {
@@ -524,8 +531,9 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
     return () => clearTimeout(timeout);
   }, [gameState, isAnswerRevealed, useMockMode, simulateMockAnswers]);
 
-  // Reset hint state when the question changes
+  // Reset hint state and answer selection when the question changes
   useEffect(() => {
+    setSelectedAnswer(null);
     setHint(null);
     setHintUsed(false);
     setHintLoading(false);

@@ -12,8 +12,6 @@ services:
     volumes:
       - ./server/syllabi:/app/syllabi
       - ./server/quizzes:/app/quizzes
-      # Ensures the service account key is available if Strands uses Firebase in the future
-      - ./server/serviceAccountKey.json:/app/serviceAccountKey.json
 
   gateway:
     build:

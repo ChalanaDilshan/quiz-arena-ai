@@ -65,9 +65,20 @@ const MOCK_QUESTIONS = [
   { text: 'Which programming language was created by Brendan Eich in 1995?', correctAnswer: 'JavaScript' },
 ];
 
+function sanitizeQuestion(q) {
+  if (!q) return null;
+  return {
+    id: q.id,
+    text: q.text,
+    options: q.options,
+    timeLimit: q.timeLimit || 20
+  };
+}
+
 function broadcastState(pin) {
   const room = rooms.get(pin);
   if (!room) return;
+  const currentQ = room.questions[room.currentQuestionIndex];
   const safeState = {
     state: room.state,
     currentQuestionIndex: room.currentQuestionIndex,
@@ -79,10 +90,17 @@ function broadcastState(pin) {
       wrongStreak: p.wrongStreak,
       isHost: p.isHost
     })),
-    // Only send the current question to clients
-    currentQuestion: room.state === 'QUESTION' ? room.questions[room.currentQuestionIndex] : null,
+    // Anti-Cheating: Strip correctIndex and explanation while question is live.
+    // Reveal full question only during LEADERBOARD and GAME_OVER.
+    currentQuestion: room.state === 'QUESTION'
+      ? sanitizeQuestion(currentQ)
+      : (room.state === 'LEADERBOARD' || room.state === 'GAME_OVER')
+        ? currentQ
+        : null,
     totalQuestions: room.questions.length,
-    timeRemaining: room.timeRemaining
+    timeRemaining: room.timeRemaining,
+    // Provide full question list at GAME_OVER for post-match tutor & analytics
+    questions: room.state === 'GAME_OVER' ? room.questions : undefined
   };
   io.to(pin).emit('gameStateUpdate', safeState);
 }
@@ -100,7 +118,17 @@ io.on('connection', (socket) => {
 
     rooms.set(pin, {
       hostSocket: socket.id,
-      players: [{ id: socket.id, nickname: 'Host', isHost: true, score: 0, streak: 0, wrongStreak: 0 }],
+      players: [{
+        id: socket.id,
+        socketId: socket.id,
+        nickname: 'Host',
+        isHost: true,
+        score: 0,
+        streak: 0,
+        wrongStreak: 0,
+        answeredCorrectly: false,
+        hasAnswered: false
+      }],
       questions: quizData.questions,
       topic: quizData.topic,
       currentQuestionIndex: 0,
@@ -109,6 +137,8 @@ io.on('connection', (socket) => {
       timerInterval: null,
       cleanupTimeout: null
     });
+    socket.playerId = socket.id;
+    socket.roomPin = pin;
     socket.join(pin);
     broadcastState(pin);
   });
@@ -120,18 +150,32 @@ io.on('connection', (socket) => {
       return;
     }
     const actualPlayerId = playerId || socket.id;
-    if (!room.players.find(p => p.id === actualPlayerId)) {
+    const existingPlayer = room.players.find(p => p.id === actualPlayerId);
+
+    if (existingPlayer) {
+      // If an existing player with this ID is bound to another active socket, reject hijacking
+      if (existingPlayer.socketId && existingPlayer.socketId !== socket.id) {
+        socket.emit('error', 'Player identity already active in this room.');
+        return;
+      }
+      // Re-bind to current socket if reconnecting
+      existingPlayer.socketId = socket.id;
+    } else {
       room.players.push({
         id: actualPlayerId,
         socketId: socket.id,
-        nickname,
+        nickname: String(nickname || 'Player').slice(0, 30),
         isHost: false,
         score: 0,
         streak: 0,
         wrongStreak: 0,
-        answeredCorrectly: false
+        answeredCorrectly: false,
+        hasAnswered: false
       });
     }
+
+    socket.playerId = actualPlayerId;
+    socket.roomPin = pin;
     socket.join(pin);
     broadcastState(pin);
   });
@@ -141,7 +185,10 @@ io.on('connection', (socket) => {
     if (room && room.hostSocket === socket.id) {
       room.state = 'QUESTION';
       room.timeRemaining = room.questions[0]?.timeLimit || 20;
-      room.players.forEach(p => p.answeredCorrectly = false);
+      room.players.forEach(p => {
+        p.answeredCorrectly = false;
+        p.hasAnswered = false;
+      });
       broadcastState(pin);
       
       // Simple timer
@@ -163,23 +210,39 @@ io.on('connection', (socket) => {
 
   socket.on('submitAnswer', ({ pin, playerId, answerIndex }) => {
     const room = rooms.get(pin);
-    if (room && room.state === 'QUESTION') {
-      const player = room.players.find(p => p.id === playerId);
-      if (player) {
-        const correctIndex = room.questions[room.currentQuestionIndex].correctIndex;
-        if (answerIndex === correctIndex) {
-          player.score += (room.timeRemaining * 10);
-          player.streak += 1;
-          player.wrongStreak = 0;
-          player.answeredCorrectly = true;
-        } else {
-          player.streak = 0;
-          player.wrongStreak += 1;
-          player.answeredCorrectly = false;
-        }
-        broadcastState(pin);
-      }
+    if (!room || room.state !== 'QUESTION') return;
+
+    // Verify player exists in the room
+    const player = room.players.find(p => p.id === playerId);
+    if (!player) {
+      socket.emit('error', 'Player not found in room');
+      return;
     }
+
+    // STRICT SESSION BINDING: Ensure requesting socket is authorized for this player
+    if (player.socketId !== socket.id) {
+      console.warn(`[Security] Session hijack blocked: socket ${socket.id} attempted to submit answer for player ${playerId}`);
+      socket.emit('error', 'Unauthorized: Invalid player session');
+      return;
+    }
+
+    // Prevent duplicate submissions for the same question
+    if (player.hasAnswered) return;
+    player.hasAnswered = true;
+
+    const correctIndex = room.questions[room.currentQuestionIndex].correctIndex;
+    if (answerIndex === correctIndex) {
+      player.score += (room.timeRemaining * 10);
+      player.streak += 1;
+      player.wrongStreak = 0;
+      player.answeredCorrectly = true;
+    } else {
+      player.streak = 0;
+      player.wrongStreak += 1;
+      player.answeredCorrectly = false;
+    }
+    socket.emit('answerAcknowledged', { answerIndex });
+    broadcastState(pin);
   });
 
   socket.on('nextQuestion', ({ pin }) => {
@@ -189,7 +252,10 @@ io.on('connection', (socket) => {
         room.currentQuestionIndex += 1;
         room.state = 'QUESTION';
         room.timeRemaining = room.questions[room.currentQuestionIndex].timeLimit || 20;
-        room.players.forEach(p => p.answeredCorrectly = false);
+        room.players.forEach(p => {
+          p.answeredCorrectly = false;
+          p.hasAnswered = false;
+        });
         broadcastState(pin);
       } else {
         room.state = 'GAME_OVER';
@@ -396,6 +462,18 @@ app.post('/api/hint', apiLimiter, requireValidRoom, async (req, res) => {
   }
   if (!Array.isArray(options) || options.length < 2) {
     return res.status(400).json({ error: 'options must be an array of answer strings' });
+  }
+
+  // Validate that the player is registered in the room
+  if (roomPin !== 'MOCK_TEST_ROOM') {
+    const room = rooms.get(roomPin);
+    if (!room) {
+      return res.status(404).json({ error: 'Room not found' });
+    }
+    const player = room.players.find(p => p.id === playerId);
+    if (!player) {
+      return res.status(403).json({ error: 'Player is not registered in this room' });
+    }
   }
 
   // Enforce one hint per player per question
