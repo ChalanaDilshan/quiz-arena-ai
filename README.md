@@ -1,4 +1,4 @@
-# 🏟️ Quiz Arena AI
+# Quiz Arena AI
 
 <div align="center">
 
@@ -14,31 +14,31 @@
 
 *Built for the "Agents for Humans" Hackathon — where AI handles the repetitive so humans can focus on what matters.*
 
-[Features](#-features) · [Architecture](#-architecture) · [The Agents](#-the-four-strands-agents) · [Quick Start](#-quick-start) · [Docker](#-docker-deployment) · [Security](#-security) · [API Reference](#-api-reference)
+[Features](#features) · [Architecture](#architecture) · [The Agents](#the-four-strands-agents) · [Quick Start](#quick-start) · [Docker](#docker-deployment) · [Security](#security) · [API Reference](#api-reference)
 
 </div>
 
 ---
 
-## ✨ Features
+## Features
 
 | Feature | Description |
 |---|---|
-| 🤖 **4 Strands SDK Agents** | Commentator, Tutor, Syllabus Generator, and Hint Master — all powered by Gemini 2.5 Flash |
-| 🎮 **Real-time Multiplayer** | WebSocket-driven live game rooms via Socket.IO — scores update instantly for all players |
-| 💡 **Live Hint System** | AI Hint Master gives players a cryptic, non-spoiler clue mid-question on demand |
-| 🎓 **AI Tutor (Post-Game)** | Multi-turn "Professor Q" tutoring session for every wrong answer with full conversation history |
-| 🎙️ **AI Game Commentator** | Live event-driven agent that reacts to streaks, scores, and dramatic moments with energetic commentary |
-| 📋 **Autonomous Quiz Generator** | Syllabus Agent scans uploaded files, generates a 5-question quiz, and awaits teacher approval |
-| 👩‍💼 **Admin Dashboard** | Full analytics, quiz history, export to CSV/PDF, and approve/reject AI-generated quizzes |
-| 🔐 **Firebase Authentication** | Secure JWT-protected admin and agent endpoints |
-| 🐳 **One-Command Docker Deployment** | `docker compose up` starts all three services |
-| 📱 **QR Code Lobby Join** | Players scan a QR code on mobile to join instantly — no typing required |
-| 🏆 **Live Leaderboard** | Animated podium and per-player stats after every question |
+| **4 Strands SDK Agents** | Commentator, Tutor, Syllabus Generator, and Hint Master — all powered by Gemini 2.5 Flash |
+| **Real-time Multiplayer** | WebSocket-driven live game rooms via Socket.IO — scores update instantly for all players |
+| **Live Hint System** | AI Hint Master gives players a cryptic, non-spoiler clue mid-question on demand |
+| **AI Tutor (Post-Game)** | Multi-turn "Professor Q" tutoring session for every wrong answer with full conversation history |
+| **AI Game Commentator** | Live event-driven agent that reacts to streaks, scores, and dramatic moments with energetic commentary |
+| **Autonomous Quiz Generator** | Syllabus Agent scans uploaded files, generates a 5-question quiz, and awaits teacher approval |
+| **Admin Dashboard** | Full analytics, quiz history, export to CSV/PDF, and approve/reject AI-generated quizzes |
+| **Firebase Authentication** | Secure JWT-protected admin and agent endpoints |
+| **One-Command Docker Deployment** | `docker compose up` starts all three services |
+| **QR Code Lobby Join** | Players scan a QR code on mobile to join instantly — no typing required |
+| **Live Leaderboard** | Animated podium and per-player stats after every question |
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 Quiz Arena uses a **three-tier, two-process** architecture that cleanly separates AI reasoning from public web routing:
 
@@ -91,13 +91,13 @@ Quiz Arena uses a **three-tier, two-process** architecture that cleanly separate
 
 ---
 
-## 🤖 The Four Strands Agents
+## The Four Strands Agents
 
 All agents are implemented in [`server/strands_agents/main.py`](./server/strands_agents/main.py) using the `strands-agents[gemini]` SDK with `GeminiModel(model_id="gemini-2.5-flash")`.
 
 ---
 
-### 1. 🎙️ Commentator Agent — *Event-Driven Live Host*
+### 1. Commentator Agent — *Event-Driven Live Host*
 
 Reacts to live game events and delivers punchy 1-2 sentence commentary to keep energy high.
 
@@ -116,7 +116,7 @@ def receive_game_event(event_type: str, player_name: str, context: str) -> str:
 
 ---
 
-### 2. 🎓 Tutor Agent (Professor Q) — *Session-Aware Multi-turn Tutor*
+### 2. Tutor Agent (Professor Q) — *Session-Aware Multi-turn Tutor*
 
 A warm, patient post-game tutor that explains wrong answers and handles follow-up questions across multiple conversation turns.
 
@@ -136,7 +136,7 @@ _tutor_sessions[session_id] = agent.messages  # ← Saved after each turn
 
 ---
 
-### 3. 📚 Syllabus Agent — *Fully Autonomous with 4 Real Tools*
+### 3. Syllabus Agent — *Fully Autonomous with 4 Real Tools*
 
 An autonomous agent that runs a complete multi-step workflow without human intervention until approval is needed.
 
@@ -168,7 +168,7 @@ An autonomous agent that runs a complete multi-step workflow without human inter
 
 ---
 
-### 4. 💡 Hint Master Agent — *Live In-Game Subtle Clue Provider*
+### 4. Hint Master Agent — *Live In-Game Subtle Clue Provider*
 
 Gives players one Socratic, non-spoiler hint per question when they're stuck. Never reveals the answer — only nudges.
 
@@ -186,11 +186,11 @@ def analyze_question(question_text: str, options: str) -> str:
 
 **Rate limiting:** One hint per player per question, enforced at the Node.js gateway layer using an in-memory `Set`.
 
-**Triggered by:** `POST /api/hint` — when a player clicks "Need a Hint? 💡" during a live question.
+**Triggered by:** `POST /api/hint` — when a player clicks "Need a Hint?" during a live question.
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
@@ -228,7 +228,7 @@ VITE_API_URL=http://localhost:3001
 
 ### 2. Start All Services
 
-#### 🪟 Windows — One-Command Start
+#### Windows — One-Command Start
 ```powershell
 .\start.ps1
 ```
@@ -240,7 +240,7 @@ npm install
 npm run dev
 ```
 
-#### 🍎 Mac / Linux — One-Command Start
+#### Mac / Linux — One-Command Start
 ```bash
 chmod +x start.sh
 ./start.sh
@@ -261,11 +261,11 @@ npm run dev
 | Strands Agents | `http://127.0.0.1:8001` |
 | Agent Health Check | `http://127.0.0.1:8001/health` |
 
-> 💡 **Mock Mode**: The app works fully without a backend in Mock Mode — start a quiz from the home screen and all AI features are simulated so you can explore the UI instantly.
+> **Mock Mode**: The app works fully without a backend in Mock Mode — start a quiz from the home screen and all AI features are simulated so you can explore the UI instantly.
 
 ---
 
-## 🐳 Docker Deployment
+## Docker Deployment
 
 Spin up all three services with a single command:
 
@@ -291,7 +291,7 @@ docker compose down
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 quiz-arena-ai/
@@ -300,7 +300,7 @@ quiz-arena-ai/
 │   │   ├── AdminDashboard.tsx    # Teacher dashboard with full analytics
 │   │   ├── CommentatorWidget.tsx # Live AI commentary display
 │   │   ├── GameOverView.tsx      # Podium, stats & Professor Q tutor
-│   │   ├── HintBubble.tsx        # 💡 Hint Master UI (animated)
+│   │   ├── HintBubble.tsx        # Hint Master UI (animated)
 │   │   ├── HomeView.tsx          # Home / join / host screens
 │   │   ├── LeaderboardView.tsx   # Between-question live leaderboard
 │   │   ├── LobbyView.tsx         # Pre-game room with QR code
@@ -317,7 +317,7 @@ quiz-arena-ai/
 │
 ├── server/                       # Backend
 │   ├── strands_agents/
-│   │   ├── main.py               # ⭐ All 4 Strands agents + FastAPI app
+│   │   ├── main.py               # All 4 Strands agents + FastAPI app
 │   │   ├── requirements.txt      # strands-agents[gemini], fastapi, boto3...
 │   │   └── Dockerfile.strands    # Python microservice container
 │   ├── index.js                  # Node.js Express gateway + Socket.IO
@@ -333,7 +333,7 @@ quiz-arena-ai/
 
 ---
 
-## 🔒 Security
+## Security
 
 | Mechanism | Implementation |
 |---|---|
@@ -348,7 +348,7 @@ quiz-arena-ai/
 
 ---
 
-## 📡 API Reference
+## API Reference
 
 ### Game Events (Socket.IO)
 
@@ -395,7 +395,7 @@ quiz-arena-ai/
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 | Layer | Technology |
 |---|---|
@@ -412,7 +412,7 @@ quiz-arena-ai/
 
 ---
 
-## 📄 License
+## License
 
 [MIT License](./LICENSE) — © 2026 Chalana Dilshan
 
@@ -420,6 +420,6 @@ quiz-arena-ai/
 
 <div align="center">
 
-Built with ❤️ using the **AWS Strands Agents SDK** · Powered by **Gemini 2.5 Flash**
+Built using the **AWS Strands Agents SDK** · Powered by **Gemini 2.5 Flash**
 
 </div>
