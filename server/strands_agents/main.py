@@ -260,7 +260,8 @@ def save_quiz_draft(topic: str, questions_json: str) -> str:
     except json.JSONDecodeError as exc:
         return f"Error: invalid JSON — {exc}"
 
-    filename = f"quiz_{uuid.uuid4().hex[:8]}_{topic[:30].replace(' ', '_')}.json"
+    safe_topic = re.sub(r'[^a-zA-Z0-9_\-]', '_', topic[:30])
+    filename = f"quiz_{uuid.uuid4().hex[:8]}_{safe_topic}.json"
     payload = {"topic": topic, "questions": questions, "status": "pending_approval"}
     payload_str = json.dumps(payload, indent=2, ensure_ascii=False)
     
@@ -346,9 +347,10 @@ raw_origins = os.environ.get(
     "STRANDS_ALLOWED_ORIGINS",
     os.environ.get("ALLOWED_ORIGINS", "http://localhost:3001,http://127.0.0.1:3001,http://gateway:3001")
 )
-allowed_origins = [o.strip() for o in raw_origins.split(",") if o.strip()]
-if "*" in allowed_origins:
-    allowed_origins = ["*"]
+allowed_origins = [o.strip() for o in raw_origins.split(",") if o.strip() and o.strip() != "*"]
+if not allowed_origins:
+    # Fallback if only '*' was provided, as '*' is invalid with allow_credentials=True
+    allowed_origins = ["http://localhost:3001"]
 
 app.add_middleware(
     CORSMiddleware,
