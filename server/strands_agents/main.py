@@ -396,9 +396,14 @@ async def commentary(req: CommentaryRequest):
 
     agent = build_commentator_agent()
     prompt = (
-        f"A live game event just happened. Use the receive_game_event tool with "
-        f"event_type='{safe_event}', player_name='{safe_player}', "
-        f"context='{safe_context}'. Then deliver your host commentary."
+        "A live game event just happened. Read the event details below in the <event_data> tags "
+        "and use the receive_game_event tool with the corresponding fields. "
+        "Then deliver your host commentary.\n"
+        f"<event_data>\n"
+        f"event_type: {safe_event}\n"
+        f"player_name: {safe_player}\n"
+        f"context: {safe_context}\n"
+        f"</event_data>"
     )
     result = agent(prompt)
     return {"comment": str(result)}
@@ -423,11 +428,13 @@ async def tutor(req: TutorRequest):
     else:
         # First turn — introduce the wrong answer
         prompt = (
-            f'I just answered a quiz question wrong.\n'
-            f'Question: "{safe_q}"\n'
-            f'My answer: "{safe_pa}"\n'
-            f'Correct answer: "{safe_ca}"\n\n'
-            f'Please explain why my answer was wrong and help me understand.'
+            'I just answered a quiz question wrong. Please read the <quiz_data> block '
+            'to see the question and answers. Explain why my answer was wrong and help me understand.\n'
+            '<quiz_data>\n'
+            f'Question: {safe_q}\n'
+            f'My answer: {safe_pa}\n'
+            f'Correct answer: {safe_ca}\n'
+            '</quiz_data>'
         )
 
     result = agent(prompt)
@@ -558,10 +565,12 @@ async def hint(req: HintRequest):
     agent  = build_hint_master_agent()
     import json as _json
     prompt = (
-        f"A player is stuck. Call analyze_question with "
-        f"question_text='{safe_question}' and "
-        f"options='{_json.dumps(safe_options)}'. "
-        f"Then deliver your single cryptic hint."
+        "A player is stuck. Read the <question_data> below and call the analyze_question tool "
+        "with the question_text and options. Then deliver your single cryptic hint.\n"
+        "<question_data>\n"
+        f"question_text: {safe_question}\n"
+        f"options: {_json.dumps(safe_options)}\n"
+        "</question_data>"
     )
     result = agent(prompt)
     return {"hint": str(result)}

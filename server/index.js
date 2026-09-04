@@ -123,6 +123,23 @@ io.on('connection', (socket) => {
   console.log('Socket connected:', socket.id);
 
   socket.on('hostGame', ({ quizData, pin }) => {
+    if (!quizData || !Array.isArray(quizData.questions) || quizData.questions.length === 0 || quizData.questions.length > 100) {
+      socket.emit('error', 'Invalid quizData: questions array is required (max 100).');
+      return;
+    }
+    
+    const isValid = quizData.questions.every(q => 
+      q && typeof q.text === 'string' && q.text.length <= 500 &&
+      Array.isArray(q.options) && q.options.length >= 2 && q.options.length <= 6 &&
+      typeof q.correctIndex === 'number' && q.correctIndex >= 0 && q.correctIndex < q.options.length &&
+      (!q.explanation || typeof q.explanation === 'string')
+    );
+    
+    if (!isValid) {
+      socket.emit('error', 'Invalid question format in quizData.');
+      return;
+    }
+
     // Clear any pending cleanup if room pin is reused
     const existingRoom = rooms.get(pin);
     if (existingRoom && existingRoom.cleanupTimeout) {
@@ -432,7 +449,7 @@ app.post('/api/agent/trigger', requireAgentAuth, apiLimiter, async (req, res) =>
   }
 });
 
-app.get('/api/agent/pending', requireAgentAuth, async (req, res) => {
+app.get('/api/agent/pending', requireAgentAuth, apiLimiter, async (req, res) => {
   try {
     const result = await getStrands('/syllabus/pending');
     res.json({ pendingQuiz: result.pending_quiz, filename: result.filename });
@@ -441,7 +458,7 @@ app.get('/api/agent/pending', requireAgentAuth, async (req, res) => {
   }
 });
 
-app.post('/api/agent/approve', requireAgentAuth, async (req, res) => {
+app.post('/api/agent/approve', requireAgentAuth, apiLimiter, async (req, res) => {
   const { filename } = req.body;
   if (!filename) return res.status(400).json({ error: 'filename required' });
   try {
@@ -452,7 +469,7 @@ app.post('/api/agent/approve', requireAgentAuth, async (req, res) => {
   }
 });
 
-app.post('/api/agent/clear', requireAgentAuth, async (req, res) => {
+app.post('/api/agent/clear', requireAgentAuth, apiLimiter, async (req, res) => {
   const { filename } = req.body ?? {};
   try {
     await callStrands('/syllabus/clear', { filename });
