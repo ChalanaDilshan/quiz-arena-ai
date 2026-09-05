@@ -1,0 +1,94 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── 1. Frontend: Type Check, Automated Tests & Bundle Build ────────────────
+  frontend:
+    name: Frontend (React + Vite)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run Automated Frontend Tests
+        run: npm test
+
+      - name: Build Production Bundle (tsc + vite)
+        run: npm run build
+
+  # ── 2. Gateway: Express, Security & Socket.io Integration Tests ───────────
+  gateway:
+    name: Gateway Server (Node.js + Socket.io)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Server Dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Run Gateway Automated Integration Tests
+        working-directory: server
+        run: npm test
+
+  # ── 3. Strands Agents: Python Microservice Security & Unit Tests ──────────
+  strands-service:
+    name: Strands Microservice (Python + FastAPI)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Python Dependencies
+        working-directory: server/strands_agents
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Strands Unit & Security Tests
+        working-directory: server/strands_agents
+        env:
+          GEMINI_API_KEY: ci-test-gemini-key
+          INTERNAL_SECRET: ci-test-secret-internal
+        run: python test_service.py
+
+  # ── 4. Docker Compose: Configuration & Orchestration Validation ───────────
+  docker-validation:
+    name: Docker Compose Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Validate Docker Compose Configuration
+        run: docker compose config

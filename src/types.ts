@@ -11,6 +11,8 @@ export interface Question {
   correctIndex: number;    // 0-based index of the correct answer
   timeLimit: number;       // Seconds allowed to answer
   explanation?: string;    // Explanation for report and review
+  attempts?: number;       // Total answers submitted for this question
+  correctAnswersCount?: number; // Total correct answers submitted for this question
 }
 
 /** A player in the quiz session */

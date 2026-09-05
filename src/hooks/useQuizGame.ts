@@ -214,10 +214,14 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
 
   /** Simulate mock opponents answering the current question */
   const simulateMockAnswers = useCallback(
-    (sess: QuizSession): Player[] => {
-      return sess.players.map(p => {
+    (sess: QuizSession): { players: Player[]; questions: Question[] } => {
+      let additionalAttempts = 0;
+      let additionalCorrect = 0;
+      const updatedPlayers = sess.players.map(p => {
         if (p.id === playerId) return p; // Don't overwrite real player
         const correct = Math.random() > 0.4;         // 60 % accuracy
+        additionalAttempts += 1;
+        if (correct) additionalCorrect += 1;
         const timeLeft = Math.floor(Math.random() * 15) + 1;
         const delta = calculateScore(correct, timeLeft, p.streak);
         return {
@@ -231,6 +235,18 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
           wrongStreak: correct ? 0 : (p.wrongStreak ?? 0) + 1,
         };
       });
+
+      const updatedQuestions = [...sess.questions];
+      const q = updatedQuestions[sess.currentQuestionIndex];
+      if (q) {
+        updatedQuestions[sess.currentQuestionIndex] = {
+          ...q,
+          attempts: (q.attempts || 0) + additionalAttempts,
+          correctAnswersCount: (q.correctAnswersCount || 0) + additionalCorrect,
+        };
+      }
+
+      return { players: updatedPlayers, questions: updatedQuestions };
     },
     [playerId, calculateScore],
   );
@@ -543,11 +559,21 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
       if (useMockMode) {
         if (!currentQuestion) return;
         const correct = answerIndex === currentQuestion.correctIndex;
-        // Update the real player's score
+        // Update the real player's score and question attempts
         setSession(prev => {
           if (!prev) return null;
+          const updatedQuestions = [...prev.questions];
+          const currQ = updatedQuestions[prev.currentQuestionIndex];
+          if (currQ) {
+            updatedQuestions[prev.currentQuestionIndex] = {
+              ...currQ,
+              attempts: (currQ.attempts || 0) + 1,
+              correctAnswersCount: (currQ.correctAnswersCount || 0) + (correct ? 1 : 0),
+            };
+          }
           return {
             ...prev,
+            questions: updatedQuestions,
             players: prev.players.map(p => {
               if (p.id !== playerId) return p;
               const delta = calculateScore(correct, timeRemaining, p.streak);
@@ -644,7 +670,11 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
     const timeout = setTimeout(() => {
       // Simulate mock opponents' answers before showing leaderboard
       if (useMockMode) {
-        setSession(prev => (prev ? { ...prev, players: simulateMockAnswers(prev) } : null));
+        setSession(prev => {
+          if (!prev) return null;
+          const { players: updatedPlayers, questions: updatedQuestions } = simulateMockAnswers(prev);
+          return { ...prev, players: updatedPlayers, questions: updatedQuestions };
+        });
       }
       setGameState('LEADERBOARD');
     }, 2000);

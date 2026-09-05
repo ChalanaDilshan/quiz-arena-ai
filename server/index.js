@@ -126,6 +126,8 @@ function broadcastState(pin) {
       score: p.score,
       streak: p.streak,
       wrongStreak: p.wrongStreak,
+      correctCount: p.correctCount || 0,
+      answersGiven: p.answersGiven || 0,
       isHost: p.isHost
     })),
     // Anti-Cheating: Strip correctIndex and explanation while question is live.
@@ -379,13 +381,23 @@ io.on('connection', (socket) => {
     // Prevent duplicate submissions for the same question
     if (player.hasAnswered) return;
     player.hasAnswered = true;
+    player.answersGiven = (player.answersGiven || 0) + 1;
 
-    const correctIndex = room.questions[room.currentQuestionIndex].correctIndex;
+    const currentQ = room.questions[room.currentQuestionIndex];
+    if (currentQ) {
+      currentQ.attempts = (currentQ.attempts || 0) + 1;
+    }
+
+    const correctIndex = currentQ ? currentQ.correctIndex : room.questions[room.currentQuestionIndex]?.correctIndex;
     if (answerIndex === correctIndex) {
       player.score += (room.timeRemaining * 10);
       player.streak += 1;
       player.wrongStreak = 0;
       player.answeredCorrectly = true;
+      player.correctCount = (player.correctCount || 0) + 1;
+      if (currentQ) {
+        currentQ.correctAnswersCount = (currentQ.correctAnswersCount || 0) + 1;
+      }
     } else {
       player.streak = 0;
       player.wrongStreak += 1;
