@@ -2,19 +2,20 @@
 
 <div align="center">
 
+![CI Pipeline](https://github.com/ChalanaDilshan/quiz-arena-ai/actions/workflows/ci.yml/badge.svg)
 ![AWS Strands Agents SDK](https://img.shields.io/badge/Strands%20Agents%20SDK-AWS%20Native-orange?style=for-the-badge&logo=amazon-aws)
 ![Amazon Bedrock](https://img.shields.io/badge/Amazon%20Bedrock-Claude%203.5%20%2F%20Nova-232F3E?style=for-the-badge&logo=amazonaws)
 ![Bedrock AgentCore](https://img.shields.io/badge/Bedrock%20AgentCore-Serverless%20Runtime-blueviolet?style=for-the-badge&logo=amazon-aws)
+![Automated Tests](https://img.shields.io/badge/Tests-23%20Passing-brightgreen?style=for-the-badge&logo=githubactions)
+![WCAG Accessibility](https://img.shields.io/badge/WCAG%20AAA-Dual%20Shapes-success?style=for-the-badge&logo=w3c)
 ![React](https://img.shields.io/badge/React%2018-Frontend-61DAFB?style=for-the-badge&logo=react)
-![Node.js](https://img.shields.io/badge/Node.js-Gateway-339933?style=for-the-badge&logo=node.js)
-![Python](https://img.shields.io/badge/Python%203.11-Agents-3776AB?style=for-the-badge&logo=python)
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge&logo=docker)
 
 **A real-time, competitive quiz arena powered by five Strands Agents SDK agents orchestrated on Amazon Bedrock AgentCore.**
 
 *Built for the AWS & AI Agents Hackathon — where intelligent multi-agent systems handle live commentary, tutoring, clue generation, and automated syllabus compilation.*
 
-[Features](#features) · [Architecture](#architecture) · [The Agents](#the-five-strands-agents) · [Bedrock AgentCore Deployment](#bedrock-agentcore-deployment) · [Quick Start](#quick-start) · [Security](#security--adversarial-hardening) · [API Reference](#api-reference)
+[Features](#features) · [Visual Signature](#bespoke-visual-signature--accessibility) · [Architecture](#architecture) · [The Agents](#the-five-strands-agents) · [Bedrock AgentCore Deployment](#bedrock-agentcore-deployment) · [Automated Testing & CI/CD](#automated-testing--cicd-pipeline) · [Quick Start](#quick-start) · [Security](#security--adversarial-hardening) · [API Reference](#api-reference)
 
 </div>
 
@@ -26,6 +27,9 @@
 |---|---|
 | **5 Strands SDK Agents** | Commentator, Tutor, Syllabus Scanner, Hint Master, and Live Quiz Generator powered by **Amazon Bedrock** (`BedrockModel` with Claude 3.5 Sonnet & Nova Pro) |
 | **Amazon Bedrock AgentCore** | Deployment-ready on AWS Bedrock AgentCore with `agentcore.yaml`, managed memory, and container runtime specs |
+| **Bespoke Visual Signature** | Signature shape+color identity (Amethyst Hexagon, Cerulean Diamond, Terracotta Star, Emerald Square) breaking away from generic Kahoot primary colors with WCAG AAA contrast |
+| **Visual Progress Stepper** | Interactive upload flow (`1. Upload PDF → 2. Configure Quiz`) with drag-and-drop scale cues, 25MB limits, and AI expectation guidance |
+| **Admin Dashboard Power Tools** | Real-time search, 6-way sorting (`Date`, `Accuracy`, `Players`, `Questions`), clean titles (`cleanTitle`), 1-click game re-hosting, and semantic accuracy thresholds |
 | **Real-time Multiplayer** | Low-latency WebSocket room registry via Socket.IO with state reconciliation and live leaderboard synchronization |
 | **Live Hint System** | AI Hint Master leverages tool-calling to evaluate options and deliver subtle, Socratic hints without spoiling answers |
 | **AI Tutor (Professor Q)** | Multi-turn post-match tutor with conversational memory explaining mistakes and exploring underlying concepts |
@@ -34,6 +38,29 @@
 | **Live AI Quiz Generation** | Real-time curriculum generation from uploaded PDFs or custom course outlines via Strands agents |
 | **Host Session Resumption** | Cryptographic host-reconnection protocol preventing host lockouts upon page refresh |
 | **Enterprise Security** | Defense-in-depth architecture: internal shared secret (`X-Internal-Token`), regex path-traversal protection, and anti-cheat answer masking |
+| **Automated Testing & CI/CD** | 23 automated tests across frontend, API gateway, and Strands agents verified in a 4-job GitHub Actions CI pipeline |
+
+---
+
+## Bespoke Visual Signature & Accessibility
+
+To establish a distinct, genre-defining identity rather than resembling a generic Kahoot clone, Quiz Arena features a bespoke visual signature that pairs curated high-contrast colorways with unique geometric shapes.
+
+### Answer Pad Design Matrix
+
+| Pad | Shape & Symbol | Visual Theme | Gradients & Border Accents | Keyboard Shortcuts | Contrast Ratio |
+|---|---|---|---|---|---|
+| **Option A** | `⬢` Hexagon | **Royal Amethyst** | Deep violet gradient (`#581C87` → `#3B0764`), `#C084FC` badge accent | `1` or `A` | **≥ 8.2:1 (AAA)** |
+| **Option B** | `◆` Diamond | **Electric Cerulean** | Deep azure gradient (`#0369A1` → `#0C4A6E`), `#38BDF8` badge accent | `2` or `B` | **≥ 7.8:1 (AAA)** |
+| **Option C** | `★` Star | **Terracotta Sienna** | Brand terracotta (`#C2410C` → `#7C2D12`), `#FB923C` badge accent | `3` or `C` | **≥ 7.1:1 (AAA)** |
+| **Option D** | `■` Square | **Deep Emerald** | Rich jade gradient (`#047857` → `#064E3B`), `#34D399` badge accent | `4` or `D` | **≥ 7.6:1 (AAA)** |
+
+### Multi-Sensory & Accessibility Highlights
+- **Dual-Coded Signaling**: Visual shapes (`⬢`, `◆`, `★`, `■`) alongside alphanumeric keys (`1–4` / `A–D`) ensure seamless play for colorblind and keyboard-only players.
+- **Tactile Feedback**:
+  - **Correct Choice**: Emerald border glow + scale bounce animation.
+  - **Incorrect Choice**: Dashed rose border + tactile shake animation.
+- **Screen Reader Announcements**: An ARIA assertive live region announces the shape, letter, and correctness without reliance on visuals alone.
 
 ---
 
@@ -150,6 +177,44 @@ Or deploy using the included automation scripts:
 
 ---
 
+## Automated Testing & CI/CD Pipeline
+
+Quiz Arena is verified by **23 automated tests** across all 3 layers of the application, integrated into a multi-job GitHub Actions CI workflow ([`.github/workflows/ci.yml`](./.github/workflows/ci.yml)):
+
+```
+┌────────────────────────────────────────────────────────────────────────────┐
+│                       GITHUB ACTIONS CI PIPELINE                           │
+├───────────────────┬───────────────────┬───────────────────┬────────────────┤
+│ 1. Frontend Job   │ 2. Gateway Job    │ 3. Strands Job    │ 4. Docker Job  │
+│ React 20 + Vite   │ Node.js 20        │ Python 3.11       │ Orchestration  │
+│ 8 Unit Tests Pass │ 6 Integ Tests Pass│ 9 Unit Tests Pass │ Config Valid   │
+└───────────────────┴───────────────────┴───────────────────┴────────────────┘
+```
+
+### Running Tests Locally
+
+#### 1. Frontend & Analytics Test Suite (8 tests)
+Verifies dynamic hardest question accuracy, CWE-1236 CSV injection sanitization, score bonuses, shape accessibility, clean titles, and semantic thresholds:
+```bash
+npm test
+```
+
+#### 2. Gateway Integration Test Suite (6 tests)
+Spawns the Node.js gateway on an isolated port, verifying the `/health` contract, host reconnection tokens, and room lifecycle:
+```bash
+cd server
+npm test
+```
+
+#### 3. Strands Microservice Test Suite (9 tests)
+Verifies Amazon Bedrock model binding, fallback resilience, tool executions, and JSON question generation:
+```bash
+cd server/strands_agents
+python test_service.py
+```
+
+---
+
 ## Quick Start
 
 ### Prerequisites
@@ -256,29 +321,39 @@ docker compose down
 
 ```
 quiz-arena-ai/
+├── .github/
+│   └── workflows/
+│       └── ci.yml                # 4-job automated GitHub Actions CI pipeline
 ├── src/                          # React Frontend (Vite + TypeScript)
 │   ├── components/
-│   │   ├── AdminDashboard.tsx    # Teacher dashboard with full analytics
+│   │   ├── AdminDashboard.tsx    # Teacher dashboard with search, sort & quick actions
 │   │   ├── CommentatorWidget.tsx # Live AI commentary display
 │   │   ├── GameOverView.tsx      # Podium, stats & Professor Q tutor
 │   │   ├── HintBubble.tsx        # Hint Master UI (animated)
-│   │   ├── HomeView.tsx          # Home / join / host screens
+│   │   ├── HomeView.tsx          # Upload stepper, dropzone cues & join screens
+│   │   ├── InteractiveHeroDemo.tsx # Interactive landing hero with signature pads
+│   │   ├── LandingPage.tsx       # Landing page with live hero demo
 │   │   ├── LeaderboardView.tsx   # Between-question live leaderboard
 │   │   ├── LobbyView.tsx         # Pre-game room with QR code
-│   │   ├── QuestionView.tsx      # Live question + hint + answer pads
+│   │   ├── QuestionView.tsx      # Bespoke visual signature pads & live hint
 │   │   └── TutorChat.tsx         # Post-game tutor chat interface
 │   ├── hooks/
 │   │   ├── useCommentator.ts     # Commentary polling hook
 │   │   └── useQuizGame.ts        # Core game state + hint logic
 │   ├── context/
-│   │   └── AuthContext.tsx       # Firebase auth context
+│   │   ├── AuthContext.tsx       # Firebase auth context
+│   │   └── ThemeContext.tsx      # Dark / light mode state
 │   └── utils/
 │       ├── quizHistory.ts        # LocalStorage quiz record management
 │       └── sounds.ts             # Web Audio API sound synthesis
 │
+├── tests/
+│   └── analytics.test.mjs        # 8 automated unit tests for scoring, shapes & titles
+│
 ├── server/                       # Backend
 │   ├── strands_agents/
 │   │   ├── main.py               # All 5 Strands agents + FastAPI app
+│   │   ├── test_service.py       # 9 automated unit tests for Bedrock agents
 │   │   ├── requirements.txt      # strands-agents, boto3, fastapi, uvicorn...
 │   │   ├── agentcore.yaml        # Amazon Bedrock AgentCore deployment manifest
 │   │   ├── agentcore.json        # AWS AgentCore CLI config
@@ -286,6 +361,8 @@ quiz-arena-ai/
 │   │   ├── Dockerfile.strands    # Python microservice container
 │   │   ├── deploy_agentcore.sh   # Bash AgentCore deployment automation
 │   │   └── deploy_agentcore.ps1  # PowerShell AgentCore deployment automation
+│   ├── test/
+│   │   └── gateway.test.js       # 6 automated integration tests for gateway & sockets
 │   ├── index.js                  # Node.js Express gateway + Socket.IO
 │   ├── firebaseAdmin.js          # Firebase Admin SDK init
 │   ├── syllabi/                  # Uploaded syllabus files (local dev)
