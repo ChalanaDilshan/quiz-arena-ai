@@ -1,10 +1,11 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Zap, ArrowLeft, LogOut, BarChart3, Users, Trophy,
   Target, Trash2, ChevronRight, Calendar, BookOpen,
   TrendingUp, AlertTriangle, CheckCircle2, Download,
-  FileSpreadsheet, X, Award, Bot,
+  FileSpreadsheet, X, Award, Bot, Search, ArrowUpDown,
+  MoreVertical, ChevronDown, Play,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -17,9 +18,82 @@ import type { Player, Question } from '../types';
 
 interface AdminDashboardProps {
   onBack: () => void;
+  onRehost?: (record: QuizRecord) => void;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+export function cleanTitle(fileName?: string): string {
+  if (!fileName) return 'Quiz Session';
+  // Strip trailing file extensions (e.g. .pdf, .json, .csv, .docx)
+  const withoutExt = fileName.replace(/\.[a-zA-Z0-9]{1,6}$/i, '').trim();
+  return withoutExt || 'Quiz Session';
+}
+
+export function getAccuracyColor(accuracy: number): {
+  hex: string;
+  twClass: string;
+  badgeBg: string;
+  label: string;
+} {
+  if (accuracy > 75) {
+    return {
+      hex: '#22c55e', // Green (>75%)
+      twClass: 'text-emerald-400',
+      badgeBg: 'rgba(34, 197, 94, 0.15)',
+      label: 'Strong (>75%)',
+    };
+  }
+  if (accuracy >= 50) {
+    return {
+      hex: '#eab308', // Yellow (50% - 75%)
+      twClass: 'text-amber-400',
+      badgeBg: 'rgba(234, 179, 8, 0.15)',
+      label: 'Moderate (50%–75%)',
+    };
+  }
+  return {
+    hex: '#ef4444', // Red (<50%)
+    twClass: 'text-rose-400',
+    badgeBg: 'rgba(239, 68, 68, 0.15)',
+    label: 'Needs Review (<50%)',
+  };
+}
+
+export function exportRecordCsv(record: QuizRecord) {
+  const sorted = [...record.players]
+    .filter((p) => !p.isHost)
+    .sort((a, b) => b.score - a.score);
+
+  const sanitize = (v: string | number) => {
+    let s = String(v).replace(/"/g, '""');
+    if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+    return `"${s}"`;
+  };
+  let csv = 'data:text/csv;charset=utf-8,';
+  csv += `Quiz Arena — Session Report\n`;
+  csv += `Date,${sanitize(formatDate(record.date))}\n`;
+  csv += `Room PIN,${sanitize(record.roomPin)}\n`;
+  csv += `Source File,${sanitize(cleanTitle(record.fileName))}\n`;
+  csv += `Questions,${record.numQuestions}\n`;
+  csv += `Difficulty,${sanitize(record.difficulty)}\n`;
+  csv += `Avg Score,${record.avgScore}\n`;
+  csv += `Accuracy,${record.accuracy}%\n\n`;
+  csv += 'Rank,Name,Score,Accuracy%,Streak\n';
+  sorted.forEach((p, i) => {
+    const correct = p.correctCount ?? Math.round(p.score / 1200);
+    const acc = record.numQuestions > 0
+      ? Math.round((correct / record.numQuestions) * 100)
+      : 0;
+    csv += `${i + 1},${sanitize(p.nickname)},${p.score},${acc}%,${p.streak}\n`;
+  });
+  const link = document.createElement('a');
+  link.href = encodeURI(csv);
+  link.download = `QuizArena_${record.roomPin}_${record.date.slice(0, 10)}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', {
@@ -36,19 +110,20 @@ function formatTime(iso: string) {
   });
 }
 
-function AccuracyBar({ value, color = 'var(--color-sienna)' }: { value: number; color?: string }) {
+function AccuracyBar({ value, color }: { value: number; color?: string }) {
+  const barColor = color ?? getAccuracyColor(value).hex;
   return (
     <div className="flex items-center gap-2">
-      <div className="flex-1 h-1.5 rounded-full bg-rim overflow-hidden">
+      <div className="flex-1 h-2 rounded-full bg-rim overflow-hidden">
         <motion.div
           initial={{ width: 0 }}
-          animate={{ width: `${value}%` }}
+          animate={{ width: `${Math.min(Math.max(value, 0), 100)}%` }}
           transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
           className="h-full rounded-full"
-          style={{ background: color }}
+          style={{ background: barColor }}
         />
       </div>
-      <span className="text-xs font-bold tabular-nums w-8 text-right" style={{ color }}>
+      <span className="text-xs font-bold tabular-nums w-8 text-right" style={{ color: barColor }}>
         {value}%
       </span>
     </div>
@@ -75,34 +150,7 @@ function QuizDetailView({
     : record.questions[0];
 
   const exportCsv = () => {
-    const sanitize = (v: string | number) => {
-      let s = String(v).replace(/"/g, '""');
-      if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
-      return `"${s}"`;
-    };
-    let csv = 'data:text/csv;charset=utf-8,';
-    csv += `Quiz Arena — Session Report\n`;
-    csv += `Date,${sanitize(formatDate(record.date))}\n`;
-    csv += `Room PIN,${sanitize(record.roomPin)}\n`;
-    csv += `Source File,${sanitize(record.fileName)}\n`;
-    csv += `Questions,${record.numQuestions}\n`;
-    csv += `Difficulty,${sanitize(record.difficulty)}\n`;
-    csv += `Avg Score,${record.avgScore}\n`;
-    csv += `Accuracy,${record.accuracy}%\n\n`;
-    csv += 'Rank,Name,Score,Accuracy%,Streak\n';
-    sorted.forEach((p, i) => {
-      const correct = p.correctCount ?? Math.round(p.score / 1200);
-      const acc = record.numQuestions > 0
-        ? Math.round((correct / record.numQuestions) * 100)
-        : 0;
-      csv += `${i + 1},${sanitize(p.nickname)},${p.score},${acc}%,${p.streak}\n`;
-    });
-    const link = document.createElement('a');
-    link.href = encodeURI(csv);
-    link.download = `QuizArena_${record.roomPin}_${record.date.slice(0, 10)}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    exportRecordCsv(record);
   };
 
   return (
@@ -146,7 +194,7 @@ function QuizDetailView({
         <div className="flex items-start justify-between gap-3 mb-4">
           <div>
             <h2 className="font-extrabold text-alabaster text-lg leading-tight truncate max-w-xs">
-              {record.fileName || 'Quiz Session'}
+              {cleanTitle(record.fileName)}
             </h2>
             <p className="text-xs text-smoke mt-1">
               PIN: <span className="font-bold text-alabaster">{record.roomPin}</span>
@@ -187,7 +235,7 @@ function QuizDetailView({
             { label: 'Players', value: record.totalPlayers, icon: Users, color: 'var(--color-sienna)' },
             { label: 'Questions', value: record.numQuestions, icon: BookOpen, color: '#a78bfa' },
             { label: 'Avg Score', value: `${record.avgScore.toLocaleString()}`, icon: Trophy, color: '#fbbf24' },
-            { label: 'Accuracy', value: `${record.accuracy}%`, icon: Target, color: '#4ade80' },
+            { label: 'Accuracy', value: `${record.accuracy}%`, icon: Target, color: getAccuracyColor(record.accuracy).hex },
           ].map(({ label, value, icon: Icon, color }) => (
             <div key={label} className="card rounded-xl p-3 border border-rim bg-canvas text-center">
               <Icon className="w-3.5 h-3.5 mx-auto mb-1.5" style={{ color }} />
@@ -233,8 +281,7 @@ function QuizDetailView({
               const acc = record.numQuestions > 0
                 ? Math.min(100, Math.round((correct / record.numQuestions) * 100))
                 : 0;
-              const accColor =
-                acc >= 75 ? '#4ade80' : acc >= 50 ? '#fbbf24' : '#f87171';
+              const accColor = getAccuracyColor(acc).hex;
 
               return (
                 <div key={player.id} className="flex items-center gap-3">
@@ -277,56 +324,207 @@ function QuizDetailView({
 function QuizCard({
   record,
   onClick,
+  onRehost,
+  onDelete,
+  onExportCsv,
 }: {
   record: QuizRecord;
   onClick: () => void;
+  onRehost?: (record: QuizRecord) => void;
+  onDelete?: (id: string) => void;
+  onExportCsv?: (record: QuizRecord) => void;
 }) {
-  const accColor =
-    record.accuracy >= 75
-      ? '#4ade80'
-      : record.accuracy >= 50
-        ? '#fbbf24'
-        : '#f87171';
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const accMeta = getAccuracyColor(record.accuracy);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [menuOpen]);
 
   return (
     <motion.div
-      whileHover={{ y: -2, scale: 1.005 }}
-      whileTap={{ scale: 0.99 }}
+      whileHover={{ y: -2 }}
       onClick={onClick}
-      className="card rounded-2xl p-5 border border-rim cursor-pointer transition-colors hover:border-sienna/40"
+      className="card group rounded-2xl p-4 sm:p-5 border border-rim cursor-pointer transition-all hover:border-sienna/40 hover:shadow-[0_8px_24px_rgba(0,0,0,0.25)] relative"
     >
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="flex-1 min-w-0">
-          <h3 className="font-bold text-sm text-alabaster truncate">
-            {record.fileName || 'Quiz Session'}
-          </h3>
-          <div className="flex items-center gap-2 mt-1">
-            <Calendar className="w-3 h-3 text-smoke" />
-            <span className="text-[11px] text-smoke">{formatDate(record.date)}</span>
-            <span className="text-[11px] text-smoke">· PIN: {record.roomPin}</span>
+          <div className="flex items-center gap-2">
+            <h3 className="font-bold text-sm sm:text-base text-alabaster truncate group-hover:text-sienna transition-colors">
+              {cleanTitle(record.fileName)}
+            </h3>
+            <span
+              className="text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0"
+              style={{
+                background:
+                  record.difficulty === 'Hard'
+                    ? 'rgba(239,68,68,0.15)'
+                    : record.difficulty === 'Easy'
+                      ? 'rgba(34,197,94,0.15)'
+                      : 'rgba(234,179,8,0.15)',
+                color:
+                  record.difficulty === 'Hard'
+                    ? '#f87171'
+                    : record.difficulty === 'Easy'
+                      ? '#4ade80'
+                      : '#fbbf24',
+              }}
+            >
+              {record.difficulty}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 mt-1 text-xs text-smoke flex-wrap">
+            <span className="flex items-center gap-1">
+              <Calendar className="w-3 h-3" />
+              {formatDate(record.date)}
+            </span>
+            <span className="text-smoke/40">·</span>
+            <span>PIN: <strong className="text-alabaster font-mono">{record.roomPin}</strong></span>
           </div>
         </div>
-        <ChevronRight className="w-4 h-4 text-smoke flex-shrink-0 mt-0.5" />
+
+        {/* Quick Action Buttons */}
+        <div className="flex items-center gap-1.5 flex-shrink-0" onClick={e => e.stopPropagation()}>
+          {/* View Analytics quick button */}
+          <button
+            type="button"
+            onClick={onClick}
+            title="View full session analytics"
+            aria-label={`View analytics for ${cleanTitle(record.fileName)}`}
+            className="hidden sm:inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg border border-rim text-smoke hover:text-alabaster hover:border-smoke/40 hover:bg-white/5 transition-all"
+          >
+            <BarChart3 className="w-3.5 h-3.5 text-sienna" />
+            <span>Analytics</span>
+          </button>
+
+          {/* Re-host Game quick button */}
+          {onRehost && record.questions && record.questions.length > 0 && (
+            <button
+              type="button"
+              onClick={() => onRehost(record)}
+              title="Re-host this quiz with the same questions"
+              aria-label={`Re-host quiz ${cleanTitle(record.fileName)}`}
+              className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-lg border border-sienna/40 bg-sienna/10 text-sienna hover:bg-sienna hover:text-white transition-all shadow-sm"
+            >
+              <Zap className="w-3.5 h-3.5" />
+              <span>Re-host</span>
+            </button>
+          )}
+
+          {/* ⋮ Overflow Menu */}
+          <div className="relative" ref={menuRef}>
+            <button
+              type="button"
+              onClick={() => setMenuOpen(!menuOpen)}
+              aria-label="More session actions"
+              aria-haspopup="true"
+              aria-expanded={menuOpen}
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-smoke hover:text-alabaster hover:bg-white/10 transition-colors"
+            >
+              <MoreVertical className="w-4 h-4" />
+            </button>
+
+            <AnimatePresence>
+              {menuOpen && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: -4 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: -4 }}
+                  transition={{ duration: 0.12 }}
+                  className="absolute right-0 top-full mt-1.5 w-44 rounded-xl border border-rim bg-elevated shadow-xl z-30 p-1 overflow-hidden"
+                >
+                  <button
+                    type="button"
+                    onClick={() => { setMenuOpen(false); onClick(); }}
+                    className="w-full flex items-center gap-2 px-2.5 py-2 text-xs font-medium text-alabaster hover:bg-white/5 rounded-lg transition-colors text-left"
+                  >
+                    <BarChart3 className="w-3.5 h-3.5 text-sienna" />
+                    <span>View Analytics</span>
+                  </button>
+
+                  {onRehost && record.questions && record.questions.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => { setMenuOpen(false); onRehost(record); }}
+                      className="w-full flex items-center gap-2 px-2.5 py-2 text-xs font-medium text-alabaster hover:bg-white/5 rounded-lg transition-colors text-left"
+                    >
+                      <Zap className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Re-host Game</span>
+                    </button>
+                  )}
+
+                  {onExportCsv && (
+                    <button
+                      type="button"
+                      onClick={() => { setMenuOpen(false); onExportCsv(record); }}
+                      className="w-full flex items-center gap-2 px-2.5 py-2 text-xs font-medium text-alabaster hover:bg-white/5 rounded-lg transition-colors text-left"
+                    >
+                      <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Export to CSV</span>
+                    </button>
+                  )}
+
+                  {onDelete && (
+                    <div className="border-t border-rim my-1 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMenuOpen(false);
+                          if (confirm(`Delete session "${cleanTitle(record.fileName)}"?`)) {
+                            onDelete(record.id);
+                          }
+                        }}
+                        className="w-full flex items-center gap-2 px-2.5 py-2 text-xs font-medium text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors text-left"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                        <span>Delete Session</span>
+                      </button>
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2 mb-3">
+      {/* Metrics Grid */}
+      <div className="grid grid-cols-3 gap-2 mb-3 bg-canvas/60 rounded-xl p-2.5 border border-rim/60">
         <div className="text-center">
           <p className="text-sm font-extrabold text-alabaster tabular-nums">{record.totalPlayers}</p>
           <p className="text-[10px] text-smoke uppercase font-semibold">Players</p>
         </div>
-        <div className="text-center">
+        <div className="text-center border-x border-rim/50">
           <p className="text-sm font-extrabold text-alabaster tabular-nums">{record.numQuestions}</p>
           <p className="text-[10px] text-smoke uppercase font-semibold">Questions</p>
         </div>
         <div className="text-center">
-          <p className="text-sm font-extrabold tabular-nums" style={{ color: accColor }}>
+          <p className="text-sm font-extrabold tabular-nums" style={{ color: accMeta.hex }}>
             {record.accuracy}%
           </p>
           <p className="text-[10px] text-smoke uppercase font-semibold">Accuracy</p>
         </div>
       </div>
 
-      <AccuracyBar value={record.accuracy} color={accColor} />
+      {/* Semantic Accuracy Bar */}
+      <div>
+        <div className="flex items-center justify-between text-[11px] mb-1">
+          <span className="text-smoke font-medium">Session Accuracy</span>
+          <span className="font-semibold text-xs" style={{ color: accMeta.hex }}>
+            {accMeta.label}
+          </span>
+        </div>
+        <AccuracyBar value={record.accuracy} color={accMeta.hex} />
+      </div>
     </motion.div>
   );
 }
@@ -353,12 +551,48 @@ function EmptyState() {
 
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 
-export function AdminDashboard({ onBack }: AdminDashboardProps) {
+export function AdminDashboard({ onBack, onRehost }: AdminDashboardProps) {
   const { user, signOut } = useAuth();
   const [selectedRecord, setSelectedRecord] = useState<QuizRecord | null>(null);
   const [records, setRecords] = useState<QuizRecord[]>(() =>
     user ? getQuizHistory(user.uid) : [],
   );
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<
+    'date-desc' | 'date-asc' | 'accuracy-desc' | 'accuracy-asc' | 'players-desc' | 'questions-desc'
+  >('date-desc');
+
+  const filteredRecords = useMemo(() => {
+    let list = records;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      list = list.filter(r => 
+        (r.fileName && r.fileName.toLowerCase().includes(q)) ||
+        (cleanTitle(r.fileName).toLowerCase().includes(q)) ||
+        (r.roomPin && r.roomPin.toLowerCase().includes(q)) ||
+        (r.difficulty && r.difficulty.toLowerCase().includes(q))
+      );
+    }
+    return [...list].sort((a, b) => {
+      switch (sortBy) {
+        case 'date-asc':
+          return new Date(a.date).getTime() - new Date(b.date).getTime();
+        case 'date-desc':
+          return new Date(b.date).getTime() - new Date(a.date).getTime();
+        case 'accuracy-desc':
+          return b.accuracy - a.accuracy;
+        case 'accuracy-asc':
+          return a.accuracy - b.accuracy;
+        case 'players-desc':
+          return b.totalPlayers - a.totalPlayers;
+        case 'questions-desc':
+          return b.numQuestions - a.numQuestions;
+        default:
+          return 0;
+      }
+    });
+  }, [records, searchQuery, sortBy]);
 
   const [pendingQuiz, setPendingQuiz] = useState<Question[] | null>(null);
   const [isApproving, setIsApproving] = useState(false);
@@ -632,13 +866,13 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
                       label: 'Avg Accuracy',
                       value: `${stats.avgAccuracy}%`,
                       icon: Target,
-                      color: '#4ade80',
+                      color: getAccuracyColor(stats.avgAccuracy).hex,
                     },
                     {
                       label: 'Best Session',
                       value: `${stats.bestAccuracy}%`,
                       icon: Award,
-                      color: '#fbbf24',
+                      color: getAccuracyColor(stats.bestAccuracy).hex,
                     },
                   ].map(({ label, value, icon: Icon, color }, idx) => (
                     <motion.div
@@ -669,26 +903,96 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
               {records.length === 0 ? (
                 <EmptyState />
               ) : (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between mb-1">
-                    <h2 className="text-sm font-bold text-smoke uppercase tracking-wider">
-                      Past Sessions
-                    </h2>
-                    <span className="text-xs text-smoke">{records.length} total</span>
+                <div className="space-y-4">
+                  {/* Search & Sorting Bar */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-rim/60">
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-sm font-bold text-alabaster uppercase tracking-wider flex items-center gap-2">
+                        <span>Past Sessions</span>
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-rim text-smoke">
+                          {filteredRecords.length}{filteredRecords.length !== records.length ? ` of ${records.length}` : ''}
+                        </span>
+                      </h2>
+                    </div>
+
+                    {/* Search & Sort Controls */}
+                    <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
+                      {/* Search Input */}
+                      <div className="relative flex-1 sm:w-60">
+                        <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-smoke pointer-events-none" />
+                        <input
+                          type="text"
+                          value={searchQuery}
+                          onChange={e => setSearchQuery(e.target.value)}
+                          placeholder="Search title, PIN, difficulty..."
+                          aria-label="Search past sessions"
+                          className="w-full text-xs rounded-xl pl-8 pr-7 py-2 bg-canvas border border-rim text-alabaster placeholder:text-smoke/60 focus:outline-none focus:border-sienna transition-colors"
+                        />
+                        {searchQuery && (
+                          <button
+                            onClick={() => setSearchQuery('')}
+                            aria-label="Clear search"
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-smoke hover:text-alabaster p-0.5"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Sort Dropdown */}
+                      <div className="relative flex items-center">
+                        <ArrowUpDown className="w-3 h-3 absolute left-2.5 top-1/2 -translate-y-1/2 text-smoke pointer-events-none" />
+                        <select
+                          value={sortBy}
+                          onChange={e => setSortBy(e.target.value as any)}
+                          aria-label="Sort past sessions"
+                          className="text-xs rounded-xl pl-7 pr-8 py-2 bg-canvas border border-rim text-alabaster cursor-pointer focus:outline-none focus:border-sienna transition-colors appearance-none font-medium"
+                        >
+                          <option value="date-desc">Date (Newest)</option>
+                          <option value="date-asc">Date (Oldest)</option>
+                          <option value="accuracy-desc">Accuracy (High to Low)</option>
+                          <option value="accuracy-asc">Accuracy (Low to High)</option>
+                          <option value="players-desc">Most Players</option>
+                          <option value="questions-desc">Most Questions</option>
+                        </select>
+                        <ChevronDown className="w-3 h-3 absolute right-2.5 top-1/2 -translate-y-1/2 text-smoke pointer-events-none" />
+                      </div>
+                    </div>
                   </div>
-                  {records.map((record, idx) => (
-                    <motion.div
-                      key={record.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.1 + idx * 0.05 }}
-                    >
-                      <QuizCard
-                        record={record}
-                        onClick={() => setSelectedRecord(record)}
-                      />
-                    </motion.div>
-                  ))}
+
+                  {/* Filtered Records */}
+                  {filteredRecords.length === 0 ? (
+                    <div className="py-12 text-center rounded-2xl border border-rim/60 bg-canvas/40 p-6">
+                      <Search className="w-8 h-8 mx-auto mb-2 text-smoke/40" />
+                      <p className="text-sm font-bold text-alabaster">No sessions match your search</p>
+                      <p className="text-xs text-smoke mt-1">
+                        No quiz records match "{searchQuery}".
+                      </p>
+                      <button
+                        onClick={() => setSearchQuery('')}
+                        className="btn-ghost text-xs !py-1.5 !px-3 text-sienna hover:bg-sienna/10 mt-3"
+                      >
+                        Clear Filter
+                      </button>
+                    </div>
+                  ) : (
+                    filteredRecords.map((record, idx) => (
+                      <motion.div
+                        key={record.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.05 + idx * 0.03 }}
+                      >
+                        <QuizCard
+                          record={record}
+                          onClick={() => setSelectedRecord(record)}
+                          onRehost={onRehost}
+                          onDelete={handleDelete}
+                          onExportCsv={exportRecordCsv}
+                        />
+                      </motion.div>
+                    ))
+                  )}
                 </div>
               )}
             </motion.div>

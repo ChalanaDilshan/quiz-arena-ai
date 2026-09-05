@@ -111,3 +111,47 @@ test('provides distinct shapes and dual keyboard shortcuts for all 4 pads', () =
     assert.ok(pad.altKey);
   });
 });
+
+// ── 5. Clean Title Stripping Helper ──────────────────────────────────────────
+
+function cleanTitle(fileName) {
+  if (!fileName) return 'Quiz Session';
+  const withoutExt = fileName.replace(/\.[a-zA-Z0-9]{1,6}$/i, '').trim();
+  return withoutExt || 'Quiz Session';
+}
+
+test('cleanTitle strips trailing file extensions (.pdf, .json, etc.)', () => {
+  assert.equal(cleanTitle('Operating_Systems_Midterm.pdf'), 'Operating_Systems_Midterm');
+  assert.equal(cleanTitle('Machine Learning Lecture 4.PDF'), 'Machine Learning Lecture 4');
+  assert.equal(cleanTitle('quiz-export.json'), 'quiz-export');
+  assert.equal(cleanTitle(''), 'Quiz Session');
+  assert.equal(cleanTitle(null), 'Quiz Session');
+});
+
+// ── 6. Semantic Accuracy Thresholds (<50% Red, 50-75% Yellow, >75% Green) ───
+
+function getAccuracyColor(accuracy) {
+  if (accuracy > 75) {
+    return { hex: '#22c55e', color: 'green' };
+  }
+  if (accuracy >= 50) {
+    return { hex: '#eab308', color: 'yellow' };
+  }
+  return { hex: '#ef4444', color: 'red' };
+}
+
+test('enforces semantic accuracy thresholds: Red (<50%), Yellow (50%-75%), Green (>75%)', () => {
+  // Red (< 50%)
+  assert.equal(getAccuracyColor(0).color, 'red');
+  assert.equal(getAccuracyColor(49).color, 'red');
+
+  // Yellow (50% - 75%)
+  assert.equal(getAccuracyColor(50).color, 'yellow');
+  assert.equal(getAccuracyColor(65).color, 'yellow');
+  assert.equal(getAccuracyColor(75).color, 'yellow');
+
+  // Green (> 75%)
+  assert.equal(getAccuracyColor(76).color, 'green');
+  assert.equal(getAccuracyColor(100).color, 'green');
+});
+

@@ -9,7 +9,7 @@ import { LobbyView } from './components/LobbyView';
 import { QuestionView } from './components/QuestionView';
 import { LeaderboardView } from './components/LeaderboardView';
 import { GameOverView } from './components/GameOverView';
-import { AdminDashboard } from './components/AdminDashboard';
+import { AdminDashboard, cleanTitle } from './components/AdminDashboard';
 import { useCommentator } from './hooks/useCommentator';
 import { CommentatorWidget } from './components/CommentatorWidget';
 
@@ -195,7 +195,21 @@ function App() {
 
   // Show admin dashboard
   if (showAdmin) {
-    return <AdminDashboard onBack={() => setShowAdmin(false)} />;
+    return (
+      <AdminDashboard
+        onBack={() => setShowAdmin(false)}
+        onRehost={(record) => {
+          setShowAdmin(false);
+          setShowLanding(false);
+          const topic = cleanTitle(record.fileName);
+          setHostFileName(topic);
+          game.hostSavedQuiz({
+            topic,
+            questions: record.questions,
+          });
+        }}
+      />
+    );
   }
 
   return (
