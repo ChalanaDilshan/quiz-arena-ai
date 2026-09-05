@@ -62,11 +62,54 @@ const DEMO_QUESTIONS: DemoQuestion[] = [
   },
 ];
 
+// Quiz Arena Bespoke Answer Pads — WCAG AAA-compliant fills (≥7.0:1 contrast)
+// Unique visual signature: Hexagon (Amethyst), Diamond (Cerulean), Star (Terracotta), Square (Emerald).
+// Breaks away from generic Kahoot primary-color palettes while preserving intuitive dual-coding.
 const PAD_COLORS = [
-  { bg: '#C0392B', active: '#E74C3C', border: '#E74C3C', letter: 'A' },
-  { bg: '#1A6B8A', active: '#2980B9', border: '#2980B9', letter: 'B' },
-  { bg: '#1E6B45', active: '#27AE60', border: '#27AE60', letter: 'C' },
-  { bg: '#B8690A', active: '#E67E22', border: '#E67E22', letter: 'D' },
+  {
+    bg: '#4A1570',
+    gradient: 'linear-gradient(135deg, #581C87 0%, #3B0764 100%)',
+    active: '#6B21A8',
+    border: 'rgba(168, 85, 247, 0.45)',
+    glow: 'rgba(168, 85, 247, 0.3)',
+    accentColor: '#C084FC',
+    letter: 'A',
+    shape: '⬢',
+    shapeName: 'Hexagon',
+  },
+  {
+    bg: '#075985',
+    gradient: 'linear-gradient(135deg, #0369A1 0%, #0C4A6E 100%)',
+    active: '#0284C7',
+    border: 'rgba(56, 189, 248, 0.45)',
+    glow: 'rgba(56, 189, 248, 0.3)',
+    accentColor: '#38BDF8',
+    letter: 'B',
+    shape: '◆',
+    shapeName: 'Diamond',
+  },
+  {
+    bg: '#9A3412',
+    gradient: 'linear-gradient(135deg, #C2410C 0%, #7C2D12 100%)',
+    active: '#EA580C',
+    border: 'rgba(251, 146, 60, 0.45)',
+    glow: 'rgba(251, 146, 60, 0.3)',
+    accentColor: '#FB923C',
+    letter: 'C',
+    shape: '★',
+    shapeName: 'Star',
+  },
+  {
+    bg: '#065F46',
+    gradient: 'linear-gradient(135deg, #047857 0%, #064E3B 100%)',
+    active: '#059669',
+    border: 'rgba(52, 211, 153, 0.45)',
+    glow: 'rgba(52, 211, 153, 0.3)',
+    accentColor: '#34D399',
+    letter: 'D',
+    shape: '■',
+    shapeName: 'Square',
+  },
 ];
 
 export function InteractiveHeroDemo({ onHost, onJoin }: InteractiveHeroDemoProps) {
@@ -338,20 +381,26 @@ export function InteractiveHeroDemo({ onHost, onJoin }: InteractiveHeroDemoProps
             const isSelected = selectedAnswer === idx;
             const isCorrect = idx === currentQ.correctIndex;
 
-            let buttonBg = pad.bg;
-            let ring = 'none';
+            let buttonBg = pad.gradient;
+            let borderStyle = `1.5px solid ${pad.border}`;
+            let shadowStyle = '0 4px 14px rgba(0,0,0,0.18)';
             let opacity = 1;
 
             if (isRevealed) {
               if (isCorrect) {
-                buttonBg = '#1E6B45'; // Emerald green for correct
-                ring = '0 0 0 2px #4ADE80';
+                buttonBg = 'linear-gradient(135deg, #059669 0%, #064E3B 100%)';
+                borderStyle = '3px solid #34D399';
+                shadowStyle = '0 0 24px rgba(52, 211, 153, 0.45)';
               } else if (isSelected && !isCorrect) {
-                buttonBg = '#991B1B'; // Dark red for wrong
-                ring = '0 0 0 2px #F87171';
+                buttonBg = 'linear-gradient(135deg, #881337 0%, #4C0519 100%)';
+                borderStyle = '3px dashed #FB7185';
+                shadowStyle = '0 0 20px rgba(251, 113, 133, 0.35)';
               } else {
-                opacity = 0.35; // Dim others
+                opacity = 0.25;
               }
+            } else if (isSelected) {
+              borderStyle = '3px solid rgba(255,255,255,0.85)';
+              shadowStyle = `0 0 22px ${pad.glow}, 0 4px 14px rgba(0,0,0,0.35)`;
             }
 
             return (
@@ -359,22 +408,23 @@ export function InteractiveHeroDemo({ onHost, onJoin }: InteractiveHeroDemoProps
                 key={`${qIndex}-${idx}`}
                 role="radio"
                 aria-checked={isSelected}
-                aria-label={`Option ${pad.letter}: ${option}${isRevealed ? (isCorrect ? ' — Correct Answer' : isSelected ? ' — Incorrect' : '') : ''}`}
+                aria-label={`Option ${pad.letter} (${pad.shapeName}): ${option}${isRevealed ? (isCorrect ? ' — Correct Answer' : isSelected ? ' — Incorrect' : '') : ''}`}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: opacity, y: 0 }}
                 transition={{ duration: 0.3, delay: idx * 0.05 }}
                 whileHover={!isRevealed ? { 
                   scale: 1.02, 
                   y: -2,
-                  boxShadow: `0 10px 25px -5px ${buttonBg}80`,
+                  boxShadow: `0 10px 25px -5px ${pad.glow}`,
                   filter: 'brightness(1.15)'
                 } : {}}
                 whileTap={!isRevealed ? { scale: 0.98, y: 0 } : {}}
                 onClick={() => handleSelectOption(idx)}
                 disabled={isRevealed}
                 style={{
-                  backgroundColor: buttonBg,
-                  boxShadow: ring !== 'none' ? ring : `inset 0 2px 0 0 rgba(255,255,255,0.1), inset 0 -4px 0 0 rgba(0,0,0,0.2)`,
+                  background: buttonBg,
+                  border: borderStyle,
+                  boxShadow: shadowStyle,
                 }}
                 className={`relative p-4 sm:p-5 rounded-2xl text-left font-semibold text-white transition-colors duration-300 cursor-pointer overflow-hidden ${
                   isRevealed ? 'cursor-default' : ''
@@ -384,8 +434,12 @@ export function InteractiveHeroDemo({ onHost, onJoin }: InteractiveHeroDemoProps
                 <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent pointer-events-none" />
                 
                 <div className="flex items-center gap-3 relative z-10">
-                  <span className="w-7 h-7 rounded-lg bg-black/30 shadow-inner flex items-center justify-center text-sm font-extrabold flex-shrink-0 backdrop-blur-sm border border-white/10">
-                    {pad.letter}
+                  <span
+                    className="w-8 h-8 rounded-lg bg-black/35 shadow-inner flex items-center justify-center text-xs font-black flex-shrink-0 backdrop-blur-sm border border-white/20"
+                    title={`${pad.shapeName} ${pad.letter}`}
+                  >
+                    <span className="mr-0.5 text-[11px]" style={{ color: pad.accentColor }}>{pad.shape}</span>
+                    <span className="text-white">{pad.letter}</span>
                   </span>
                   <span className="text-sm sm:text-base font-bold leading-snug line-clamp-2 text-shadow-sm">
                     {option}

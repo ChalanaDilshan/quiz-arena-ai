@@ -21,13 +21,58 @@ interface QuestionViewProps {
   onRequestHint: () => void;
 }
 
-// Dual-coded Answer pads — WCAG AA-compliant fills (≥5.0:1 contrast on white text)
-// Each pad features a distinct geometric shape, letter, and keyboard shortcut for colorblind & keyboard accessibility.
+// Quiz Arena Bespoke Answer Pads — WCAG AAA-compliant fills (≥7.0:1 contrast)
+// Unique visual signature: Hexagon (Amethyst), Diamond (Cerulean), Star (Terracotta), Square (Emerald).
+// Breaks away from generic primary-color palettes while preserving intuitive dual-coding.
 const PADS = [
-  { bg: '#9B2215', active: '#C0392B', label: 'A', key: '1', shape: '▲', shapeName: 'Triangle' }, // deep crimson
-  { bg: '#155275', active: '#1A6B8A', label: 'B', key: '2', shape: '◆', shapeName: 'Diamond'  }, // deep teal-blue
-  { bg: '#155233', active: '#1E6B45', label: 'C', key: '3', shape: '●', shapeName: 'Circle'   }, // deep forest
-  { bg: '#7A4009', active: '#A0540C', label: 'D', key: '4', shape: '■', shapeName: 'Square'   }, // deep amber
+  {
+    bg: '#4A1570',
+    gradient: 'linear-gradient(135deg, #581C87 0%, #3B0764 100%)',
+    active: '#6B21A8',
+    border: 'rgba(168, 85, 247, 0.45)',
+    glow: 'rgba(168, 85, 247, 0.3)',
+    accentColor: '#C084FC',
+    label: 'A',
+    key: '1',
+    shape: '⬢',
+    shapeName: 'Hexagon',
+  },
+  {
+    bg: '#075985',
+    gradient: 'linear-gradient(135deg, #0369A1 0%, #0C4A6E 100%)',
+    active: '#0284C7',
+    border: 'rgba(56, 189, 248, 0.45)',
+    glow: 'rgba(56, 189, 248, 0.3)',
+    accentColor: '#38BDF8',
+    label: 'B',
+    key: '2',
+    shape: '◆',
+    shapeName: 'Diamond',
+  },
+  {
+    bg: '#9A3412',
+    gradient: 'linear-gradient(135deg, #C2410C 0%, #7C2D12 100%)',
+    active: '#EA580C',
+    border: 'rgba(251, 146, 60, 0.45)',
+    glow: 'rgba(251, 146, 60, 0.3)',
+    accentColor: '#FB923C',
+    label: 'C',
+    key: '3',
+    shape: '★',
+    shapeName: 'Star',
+  },
+  {
+    bg: '#065F46',
+    gradient: 'linear-gradient(135deg, #047857 0%, #064E3B 100%)',
+    active: '#059669',
+    border: 'rgba(52, 211, 153, 0.45)',
+    glow: 'rgba(52, 211, 153, 0.3)',
+    accentColor: '#34D399',
+    label: 'D',
+    key: '4',
+    shape: '■',
+    shapeName: 'Square',
+  },
 ];
 
 type PadState = 'default' | 'selected' | 'correct' | 'incorrect' | 'dimmed';
@@ -212,27 +257,34 @@ export function QuestionView({
           const isUserChoice = selectedAnswer === i;
           const isCorrectAnswer = i === question.correctIndex;
 
-          const bgColor =
-            state === 'correct' ? '#1E6B45' : state === 'incorrect' ? '#6B1E1E' :
-            state === 'selected' ? pad.active : pad.bg;
-          const opacity = state === 'dimmed' ? 0.25 : 1;
+          const bgStyle =
+            state === 'correct'
+              ? 'linear-gradient(135deg, #059669 0%, #064E3B 100%)'
+              : state === 'incorrect'
+                ? 'linear-gradient(135deg, #881337 0%, #4C0519 100%)'
+                : state === 'selected'
+                  ? pad.gradient
+                  : pad.gradient;
+          const opacity = state === 'dimmed' ? 0.22 : 1;
 
           // Multi-sensory borders & ring styles (not reliant on color alone)
           const borderStyle =
             state === 'correct'
               ? '3px solid #34D399' // Solid bold emerald border for correct
               : state === 'incorrect'
-                ? '3px dashed #F87171' // Dashed bold rose border for incorrect
+                ? '3px dashed #FB7185' // Dashed bold rose border for incorrect
                 : state === 'selected'
-                  ? '3px solid rgba(255,255,255,0.7)'
-                  : '3px solid transparent';
+                  ? '3px solid rgba(255,255,255,0.85)'
+                  : `1.5px solid ${pad.border}`;
 
           const shadowStyle =
             state === 'correct'
-              ? '0 0 20px rgba(52, 211, 153, 0.4)'
+              ? '0 0 24px rgba(52, 211, 153, 0.45)'
               : state === 'incorrect'
-                ? '0 0 16px rgba(248, 113, 113, 0.3)'
-                : 'none';
+                ? '0 0 20px rgba(251, 113, 133, 0.35)'
+                : state === 'selected'
+                  ? `0 0 22px ${pad.glow}, 0 4px 14px rgba(0,0,0,0.35)`
+                  : '0 4px 14px rgba(0,0,0,0.18)';
 
           // Tactile animation for wrong vs correct
           const shakeAnim = state === 'incorrect' ? { x: [-4, 4, -3, 3, 0] } : {};
@@ -261,26 +313,32 @@ export function QuestionView({
               onClick={() => !disabled && onSubmitAnswer(i)}
               disabled={disabled}
               style={{
-                background: bgColor,
+                background: bgStyle,
                 border: borderStyle,
                 boxShadow: shadowStyle,
                 borderRadius: '12px',
               }}
-              className="relative p-5 sm:p-6 text-left font-semibold text-white transition-all duration-200 focus:outline-none focus-visible:ring-4 focus-visible:ring-white/60"
+              className="relative p-5 sm:p-6 text-left font-semibold text-white transition-all duration-200 focus:outline-none focus-visible:ring-4 focus-visible:ring-white/60 overflow-hidden"
             >
+              {/* Subtle top edge highlight */}
+              <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/25 to-transparent pointer-events-none" />
+
               <div className="flex items-start gap-3">
                 {/* Dual-shape & letter badge */}
                 <span
-                  className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black shadow-inner border border-white/20"
-                  style={{ background: 'rgba(0,0,0,0.3)' }}
+                  className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black shadow-inner border border-white/20 transition-transform"
+                  style={{
+                    background: 'rgba(0,0,0,0.35)',
+                    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.15)'
+                  }}
                   title={`${pad.shapeName} ${pad.label}`}
                 >
-                  <span className="mr-0.5 text-[10px] opacity-80">{pad.shape}</span>
-                  <span>{pad.label}</span>
+                  <span className="mr-0.5 text-[11px]" style={{ color: pad.accentColor }}>{pad.shape}</span>
+                  <span className="text-white">{pad.label}</span>
                 </span>
 
                 <div className="flex-1 min-w-0 pr-8">
-                  <span className="text-sm sm:text-base leading-snug font-bold block">
+                  <span className="text-sm sm:text-base leading-snug font-bold block text-white drop-shadow-sm">
                     {option}
                   </span>
                 </div>

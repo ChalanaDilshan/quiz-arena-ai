@@ -95,10 +95,10 @@ test('calculates correct score with speed and streak bonuses', () => {
 // ── 4. Accessibility & Shape Pad Mapping ─────────────────────────────────────
 
 const SHAPES = [
-  { shape: 'triangle', symbol: '▲', key: '1', altKey: 'A' },
-  { shape: 'diamond',  symbol: '◆', key: '2', altKey: 'B' },
-  { shape: 'circle',   symbol: '●', key: '3', altKey: 'C' },
-  { shape: 'square',   symbol: '■', key: '4', altKey: 'D' },
+  { shape: 'hexagon', symbol: '⬢', key: '1', altKey: 'A' },
+  { shape: 'diamond', symbol: '◆', key: '2', altKey: 'B' },
+  { shape: 'star',    symbol: '★', key: '3', altKey: 'C' },
+  { shape: 'square',  symbol: '■', key: '4', altKey: 'D' },
 ];
 
 test('provides distinct shapes and dual keyboard shortcuts for all 4 pads', () => {
