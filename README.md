@@ -278,14 +278,23 @@ quiz-arena-ai/
 │
 ├── server/                       # Backend
 │   ├── strands_agents/
-│   │   ├── main.py               # All 4 Strands agents + FastAPI app
-│   │   ├── requirements.txt      # strands-agents[gemini], fastapi, boto3...
-│   │   └── Dockerfile.strands    # Python microservice container
+│   │   ├── main.py               # All 5 Strands agents + FastAPI app
+│   │   ├── requirements.txt      # strands-agents, boto3, fastapi, uvicorn...
+│   │   ├── agentcore.yaml        # Amazon Bedrock AgentCore deployment manifest
+│   │   ├── agentcore.json        # AWS AgentCore CLI config
+│   │   ├── Dockerfile.agentcore  # AgentCore microVM container
+│   │   ├── Dockerfile.strands    # Python microservice container
+│   │   ├── deploy_agentcore.sh   # Bash AgentCore deployment automation
+│   │   └── deploy_agentcore.ps1  # PowerShell AgentCore deployment automation
 │   ├── index.js                  # Node.js Express gateway + Socket.IO
 │   ├── firebaseAdmin.js          # Firebase Admin SDK init
 │   ├── syllabi/                  # Uploaded syllabus files (local dev)
 │   └── quizzes/                  # Generated quiz drafts (local dev)
 │
+├── infrastructure/               # Infrastructure-as-Code
+│   └── agentcore-stack.yaml      # CloudFormation template for Bedrock AgentCore
+├── docs/
+│   └── BEDROCK_AGENTCORE_ARCHITECTURE.md # Full architectural specification
 ├── Dockerfile.frontend           # Nginx-served React production build
 ├── docker-compose.yml            # Orchestrates all 3 containers
 ├── start.ps1                     # Windows one-command startup script
@@ -320,11 +329,13 @@ quiz-arena-ai/
 | Event | Direction | Payload |
 |---|---|---|
 | `hostGame` | Client → Server | `{ quizData, pin }` |
+| `reconnectHost` | Client → Server | `{ pin, hostToken, hostId }` |
 | `joinGame` | Client → Server | `{ pin, nickname, playerId }` |
-| `startGame` | Client → Server | `{ pin }` |
+| `startGame` | Client → Server | `{ pin, hostToken }` |
 | `submitAnswer` | Client → Server | `{ pin, playerId, answerIndex }` |
-| `nextQuestion` | Client → Server | `{ pin }` |
-| `gameStateUpdate` | Server → All | Full game state snapshot |
+| `nextQuestion` | Client → Server | `{ pin, hostToken }` |
+| `kickPlayer` | Client → Server | `{ pin, targetPlayerId, hostToken }` |
+| `gameStateUpdate` | Server → All | Full game state snapshot (anti-cheat masked) |
 
 ### REST Endpoints
 
@@ -332,9 +343,11 @@ quiz-arena-ai/
 
 | Method | Endpoint | Description |
 |---|---|---|
+| `POST` | `/api/generate-quiz` | Compile live quiz questions via Strands QuizGeneratorAgent |
 | `POST` | `/api/commentary` | Trigger AI commentator for a game event |
 | `POST` | `/api/tutor/explain` | Ask Professor Q to explain a wrong answer |
 | `POST` | `/api/hint` | Request a live hint from the Hint Master |
+| `GET` | `/health` | Gateway health check (reports Bedrock & Strands metadata) |
 
 #### Admin (Firebase JWT required)
 
@@ -349,6 +362,7 @@ quiz-arena-ai/
 
 | Method | Endpoint | Description |
 |---|---|---|
+| `POST` | `/generate-quiz` | Quiz Generator Agent (curriculum compilation) |
 | `POST` | `/commentary` | Commentator Agent |
 | `POST` | `/tutor` | Tutor Agent |
 | `POST` | `/syllabus/trigger` | Syllabus Agent autonomous run |
@@ -356,24 +370,24 @@ quiz-arena-ai/
 | `POST` | `/syllabus/approve` | Update quiz status to approved |
 | `POST` | `/syllabus/clear` | Delete a quiz file |
 | `POST` | `/hint` | Hint Master Agent |
-| `GET` | `/health` | Health check — lists all 4 active agents |
+| `GET` | `/health` | Health check — lists all 5 active agents + Bedrock provider |
 
 ---
 
 ## Tech Stack
 
-| Layer | Technology |
-|---|---|
-| **AI Agents** | [AWS Strands Agents SDK](https://github.com/strands-agents/sdk-python) (`strands-agents[gemini]`) |
-| **LLM** | Google Gemini 2.5 Flash via `strands.models.gemini.GeminiModel` |
-| **Agent Server** | Python 3.11 · FastAPI · Uvicorn |
-| **API Gateway** | Node.js v24 · Express 5 · Socket.IO 4 |
-| **Auth** | Firebase Admin SDK · Firebase Authentication |
-| **Storage** | AWS S3 (production) · Local filesystem (development) |
-| **Frontend** | React 18 · TypeScript · Vite 8 · Framer Motion |
-| **Styling** | Tailwind CSS 3 · Custom CSS design tokens |
-| **Containerisation** | Docker · Docker Compose · Nginx |
-| **Security** | Helmet.js · express-rate-limit · Firebase JWT |
+| Layer | Technology | Role & Details |
+|---|---|---|
+| **AI Agent Framework** | **[Strands Agents SDK](https://github.com/strands-agents/sdk-python)** (`strands-agents`) | Multi-agent orchestration, tool-calling loops, and prompt workflows |
+| **Primary LLM Provider** | **Amazon Bedrock** (`BedrockModel` via `boto3`) | Anthropic Claude 3.5 Sonnet / Claude 3.7 Sonnet / Amazon Nova Pro |
+| **Fallback LLM Provider** | **Google Gemini** (`GeminiModel` via `GEMINI_API_KEY`) | Seamless local/offline fallback if AWS credentials are not configured |
+| **Agent Serverless Platform** | **Amazon Bedrock AgentCore** | Managed microVM runtime (`agentcore.yaml`), AgentCore Memory, and Gateway |
+| **Agent Microservice** | Python 3.11 · FastAPI · Uvicorn | Internal high-concurrency microservice on port 8001 |
+| **API Gateway** | Node.js 20 · Express 5 · Socket.IO 4 | Real-time state synchronization, anti-cheat masking, rate limiting |
+| **Knowledge & Storage** | Amazon S3 & Local Fallback | Syllabi documents and quiz draft persistence (`AWS_S3_BUCKET_NAME`) |
+| **Frontend UI** | React 18 · TypeScript · Vite 8 · Framer Motion | Real-time podium, sound synthesis, QR join, dark/light themes |
+| **Authentication** | Firebase Admin SDK & Internal Token Guard | JWT admin authentication & `X-Internal-Token` microservice isolation |
+| **Infrastructure & CI/CD** | AWS CloudFormation · Docker Compose · GitHub Actions | Automated 4-job CI pipeline, containerized orchestrations |
 
 ---
 
@@ -385,6 +399,6 @@ quiz-arena-ai/
 
 <div align="center">
 
-Built using the **AWS Strands Agents SDK** · Powered by **Gemini 2.5 Flash**
+Built with **Strands Agents SDK** on **Amazon Bedrock AgentCore** · Powered by **Amazon Bedrock (Claude 3.5 Sonnet & Nova Pro)**
 
 </div>
