@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, type DragEvent, type ChangeEvent } from 'r
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Upload, Users, Zap, FileText, ArrowRight,
-  Sparkles, ChevronLeft, ChevronUp, ChevronDown, LogIn, LayoutDashboard, BookOpen,
+  Sparkles, ChevronLeft, ChevronUp, ChevronDown, LogIn, LayoutDashboard, BookOpen, Check,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getSavedQuizzes, type SavedQuiz } from '../utils/quizHistory';
@@ -76,30 +76,36 @@ export function HomeView({ onJoinGame, onHostGame, onHostSavedQuiz, uploadProgre
   const fullPin = pin.join('');
   const canJoin = fullPin.length === 6 && nickname.trim().length >= 2;
 
+  const MAX_FILE_SIZE_MB = 25;
+  const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+
+  const validateAndSetFile = (f: File) => {
+    const isPdf = f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf');
+    if (!isPdf) {
+      setFileError('Only PDF files are allowed.');
+      setSelectedFile(null);
+      return;
+    }
+    if (f.size > MAX_FILE_SIZE_BYTES) {
+      setFileError(`File exceeds the ${MAX_FILE_SIZE_MB}MB limit (${(f.size / (1024 * 1024)).toFixed(1)} MB).`);
+      setSelectedFile(null);
+      return;
+    }
+    setSelectedFile(f);
+    setFileError(null);
+  };
+
   const handleDragOver = (e: DragEvent) => { e.preventDefault(); setIsDragging(true); };
   const handleDragLeave = (e: DragEvent) => { e.preventDefault(); setIsDragging(false); };
   const handleDrop = (e: DragEvent) => {
-    e.preventDefault(); setIsDragging(false);
+    e.preventDefault();
+    setIsDragging(false);
     const f = e.dataTransfer.files[0];
-    if (f) {
-      if (f.type === 'application/pdf' && f.name.toLowerCase().endsWith('.pdf')) {
-        setSelectedFile(f);
-        setFileError(null);
-      } else {
-        setFileError('Only PDF files are allowed.');
-      }
-    }
+    if (f) validateAndSetFile(f);
   };
   const handleFileSelect = (e: ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
-    if (f) {
-      if (f.type === 'application/pdf' && f.name.toLowerCase().endsWith('.pdf')) {
-        setSelectedFile(f);
-        setFileError(null);
-      } else {
-        setFileError('Only PDF files are allowed.');
-      }
-    }
+    if (f) validateAndSetFile(f);
   };
 
   const adjustQ = (d: number) => setNumQuestions(q => Math.min(MAX_Q, Math.max(MIN_Q, q + d)));
@@ -220,121 +226,222 @@ export function HomeView({ onJoinGame, onHostGame, onHostSavedQuiz, uploadProgre
                   </button>
                 </motion.div>
 
-              ) : hostStep === 'upload' ? (
-                <motion.div key="host-upload" initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -8 }} transition={{ duration: 0.16 }}>
-                  <p className="text-[10px] uppercase tracking-widest font-semibold text-sienna mb-3">Step 1 of 2 · Upload PDF</p>
-
-                  {/* Google sign-in prompt for guests */}
-                  {!user && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      className="mb-4 px-3.5 py-3 rounded-xl border flex items-center justify-between gap-3"
-                      style={{ background: 'var(--color-canvas)', borderColor: 'var(--color-rim)' }}
-                    >
-                      <div className="min-w-0">
-                        <p className="text-xs font-semibold text-alabaster">Save quiz history</p>
-                        <p className="text-[10px] text-smoke mt-0.5">Sign in to track student performance.</p>
-                      </div>
-                      <button
-                        onClick={signInWithGoogle}
-                        className="flex-shrink-0 flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 rounded-lg border border-sienna/40 text-sienna hover:bg-sienna/10 transition-colors"
-                      >
-                        <LogIn className="w-3 h-3" />
-                        Sign in
-                      </button>
-                    </motion.div>
-                  )}
-
-                  {/* Signed-in badge */}
-                  {user && (
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="mb-4 px-3.5 py-2.5 rounded-xl border flex items-center gap-2"
-                      style={{ background: 'rgba(34,197,94,0.06)', borderColor: 'rgba(34,197,94,0.25)' }}
-                    >
-                      {user.photoURL
-                        ? <img src={user.photoURL} alt="avatar" className="w-5 h-5 rounded-full flex-shrink-0" />
-                        : <LayoutDashboard className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                      }
-                      <p className="text-[11px] font-semibold text-emerald-400 truncate">
-                        Quiz will be saved to your dashboard
-                      </p>
-                    </motion.div>
-                  )}
-                  <div
-                    onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}
-                    onClick={() => fileInputRef.current?.click()}
-                    className="rounded-xl p-8 text-center cursor-pointer transition-all duration-200 mb-5"
-                    style={{
-                      border: isDragging ? '1.5px dashed var(--color-sienna)' : selectedFile ? '1.5px dashed color-mix(in srgb, var(--color-sienna) 40%, transparent)' : '1.5px dashed var(--color-rim)',
-                      background: isDragging ? 'var(--color-sienna-wash)' : selectedFile ? 'color-mix(in srgb, var(--color-sienna) 4%, transparent)' : 'var(--color-canvas)',
-                    }}
-                  >
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept=".pdf"
-                      aria-label="Upload PDF file"
-                      onChange={handleFileSelect}
-                      className="hidden"
-                    />
-                    {selectedFile ? (
-                      <>
-                        <FileText className="w-9 h-9 mx-auto mb-3 text-sienna" />
-                        <p className="text-sm font-semibold text-alabaster">{selectedFile.name}</p>
-                        <p className="text-xs mt-1 text-smoke">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB · PDF</p>
-                      </>
-                    ) : (
-                      <>
-                        <Upload className="w-9 h-9 mx-auto mb-3 transition-colors" style={{ color: isDragging ? 'var(--color-sienna)' : 'var(--color-smoke)' }} />
-                        <p className="text-sm font-semibold text-alabaster">Drop your PDF</p>
-                        <p className="text-xs mt-1 text-smoke">or click to browse</p>
-                      </>
-                    )}
-                  </div>
-                  <button onClick={() => selectedFile && setHostStep('config')} disabled={!selectedFile} className="btn-primary w-full">
-                    Continue <ArrowRight className="w-4 h-4" />
-                  </button>
-
-                  {/* Saved Quizzes Section */}
-                  {savedQuizzes.length > 0 && (
-                    <div className="mt-6 pt-6 border-t border-rim">
-                      <p className="text-[10px] uppercase tracking-widest font-semibold text-smoke mb-3">Or host a saved quiz</p>
-                      <div className="space-y-2">
-                        {savedQuizzes.map(quiz => (
-                          <div 
-                            key={quiz.id} 
-                            className="flex items-center justify-between p-3 rounded-xl border border-rim hover:border-sienna transition-colors bg-canvas cursor-pointer" 
-                            onClick={() => onHostSavedQuiz?.(quiz)}
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-lg bg-sienna/10 flex items-center justify-center">
-                                <BookOpen className="w-4 h-4 text-sienna" />
-                              </div>
-                              <div className="text-left">
-                                <p className="text-xs font-bold text-alabaster">{quiz.topic}</p>
-                                <p className="text-[10px] text-smoke">{quiz.questions.length} questions</p>
-                              </div>
-                            </div>
-                            <button className="btn-ghost !px-2 !py-1 text-xs text-sienna hover:bg-sienna/10">Host</button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </motion.div>
-
               ) : (
-                <motion.div key="host-config" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}>
-                  {/* Step header */}
-                  <div className="flex items-center justify-between mb-5">
-                    <p className="text-[10px] uppercase tracking-widest font-semibold text-sienna">Step 2 of 2 · Configure</p>
-                    <button onClick={() => setHostStep('upload')} className="text-xs font-medium text-smoke hover:text-alabaster transition-colors flex items-center gap-1">
-                      <ChevronLeft className="w-3.5 h-3.5" /> Back
-                    </button>
-                  </div>
+                <motion.div key="host" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                  {/* Visual Progress Stepper */}
+                  <nav aria-label="Host quiz progression" className="mb-5">
+                    <ol className="flex items-center gap-2 p-1.5 rounded-xl bg-canvas border border-rim">
+                      {/* Step 1 */}
+                      <li className="flex-1">
+                        <button
+                          type="button"
+                          onClick={() => hostStep === 'config' && setHostStep('upload')}
+                          disabled={hostStep === 'upload'}
+                          className={`w-full flex items-center justify-center gap-2 py-2 px-2.5 rounded-lg text-xs font-bold transition-all ${
+                            hostStep === 'upload'
+                              ? 'bg-sienna text-white shadow-sm ring-1 ring-sienna/40'
+                              : 'text-smoke hover:text-alabaster hover:bg-white/5 cursor-pointer'
+                          }`}
+                        >
+                          <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-extrabold flex-shrink-0 ${
+                            hostStep === 'upload'
+                              ? 'bg-white/25 text-white'
+                              : selectedFile
+                                ? 'bg-emerald-500/20 text-emerald-400'
+                                : 'bg-white/10 text-smoke'
+                          }`}>
+                            {selectedFile && hostStep === 'config' ? <Check className="w-3 h-3" /> : '1'}
+                          </span>
+                          <span className="truncate">1. Upload PDF</span>
+                        </button>
+                      </li>
+
+                      <span className="text-smoke/40 text-xs font-bold select-none px-0.5">→</span>
+
+                      {/* Step 2 */}
+                      <li className="flex-1">
+                        <button
+                          type="button"
+                          onClick={() => selectedFile && setHostStep('config')}
+                          disabled={!selectedFile || hostStep === 'config'}
+                          className={`w-full flex items-center justify-center gap-2 py-2 px-2.5 rounded-lg text-xs font-bold transition-all ${
+                            hostStep === 'config'
+                              ? 'bg-sienna text-white shadow-sm ring-1 ring-sienna/40'
+                              : selectedFile
+                                ? 'text-smoke hover:text-alabaster hover:bg-white/5 cursor-pointer'
+                                : 'text-smoke/40 cursor-not-allowed'
+                          }`}
+                        >
+                          <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-extrabold flex-shrink-0 ${
+                            hostStep === 'config'
+                              ? 'bg-white/25 text-white'
+                              : 'bg-white/10 text-smoke/50'
+                          }`}>
+                            2
+                          </span>
+                          <span className="truncate">2. Configure Quiz</span>
+                        </button>
+                      </li>
+                    </ol>
+                  </nav>
+
+                  <AnimatePresence mode="wait">
+                    {hostStep === 'upload' ? (
+                      <motion.div key="host-upload" initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -8 }} transition={{ duration: 0.16 }}>
+                        {/* Google sign-in prompt for guests */}
+                        {!user && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            className="mb-4 px-3.5 py-3 rounded-xl border flex items-center justify-between gap-3"
+                            style={{ background: 'var(--color-canvas)', borderColor: 'var(--color-rim)' }}
+                          >
+                            <div className="min-w-0">
+                              <p className="text-xs font-semibold text-alabaster">Save quiz history</p>
+                              <p className="text-[10px] text-smoke mt-0.5">Sign in to track student performance.</p>
+                            </div>
+                            <button
+                              onClick={signInWithGoogle}
+                              className="flex-shrink-0 flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 rounded-lg border border-sienna/40 text-sienna hover:bg-sienna/10 transition-colors"
+                            >
+                              <LogIn className="w-3 h-3" />
+                              Sign in
+                            </button>
+                          </motion.div>
+                        )}
+
+                        {/* Signed-in badge */}
+                        {user && (
+                          <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className="mb-4 px-3.5 py-2.5 rounded-xl border flex items-center gap-2"
+                            style={{ background: 'rgba(34,197,94,0.06)', borderColor: 'rgba(34,197,94,0.25)' }}
+                          >
+                            {user.photoURL
+                              ? <img src={user.photoURL} alt="avatar" className="w-5 h-5 rounded-full flex-shrink-0" />
+                              : <LayoutDashboard className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                            }
+                            <p className="text-[11px] font-semibold text-emerald-400 truncate">
+                              Quiz will be saved to your dashboard
+                            </p>
+                          </motion.div>
+                        )}
+
+                        {/* Enhanced Dropzone with Explicit Drag-Over State */}
+                        <motion.div
+                          onDragOver={handleDragOver}
+                          onDragLeave={handleDragLeave}
+                          onDrop={handleDrop}
+                          onClick={() => fileInputRef.current?.click()}
+                          animate={{
+                            scale: isDragging ? 1.025 : 1,
+                          }}
+                          transition={{ duration: 0.18, ease: 'easeOut' }}
+                          className={`rounded-2xl p-7 text-center cursor-pointer transition-colors duration-200 relative overflow-hidden ${
+                            isDragging
+                              ? 'border-2 border-dashed border-sienna bg-sienna-wash shadow-[0_0_24px_rgba(224,122,95,0.25)]'
+                              : selectedFile
+                                ? 'border-2 border-dashed border-sienna/50 bg-sienna-wash/20 hover:border-sienna'
+                                : 'border-2 border-dashed border-rim hover:border-sienna/50 bg-canvas hover:bg-sienna-wash/10'
+                          }`}
+                        >
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept=".pdf"
+                            aria-label="Upload PDF file"
+                            onChange={handleFileSelect}
+                            className="hidden"
+                          />
+                          {selectedFile ? (
+                            <div className="flex flex-col items-center">
+                              <div className="w-12 h-12 rounded-xl bg-sienna/10 border border-sienna/30 flex items-center justify-center mb-3">
+                                <FileText className="w-6 h-6 text-sienna" />
+                              </div>
+                              <p className="text-sm font-bold text-alabaster max-w-full truncate px-4">
+                                {selectedFile.name}
+                              </p>
+                              <p className="text-xs mt-1 text-smoke font-medium">
+                                {(selectedFile.size / 1024 / 1024).toFixed(2)} MB · PDF ready
+                              </p>
+                              <span className="text-[11px] text-sienna font-semibold mt-2 hover:underline">
+                                Click to replace file
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center">
+                              <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-3 transition-colors ${
+                                isDragging ? 'bg-sienna text-white scale-110 shadow-lg' : 'bg-white/5 border border-rim text-smoke'
+                              }`}>
+                                <Upload className={`w-6 h-6 transition-transform ${isDragging ? 'animate-bounce text-white' : ''}`} />
+                              </div>
+                              <p className="text-sm font-bold text-alabaster">
+                                {isDragging ? 'Release to upload PDF' : 'Drop your PDF here'}
+                              </p>
+                              <p className="text-xs mt-1 text-smoke font-medium">
+                                or <span className="text-sienna font-semibold">browse file</span> from your computer
+                              </p>
+                            </div>
+                          )}
+                        </motion.div>
+
+                        {/* File Restrictions */}
+                        <p className="text-[11px] text-smoke text-center mt-2.5 mb-4 flex items-center justify-center gap-1.5 font-medium">
+                          <span>Maximum file size: 25MB</span>
+                          <span className="text-smoke/40">·</span>
+                          <span>PDF files only</span>
+                        </p>
+
+                        {/* Expectation Setting note */}
+                        <div className="flex items-start gap-2.5 p-3 rounded-xl bg-sienna-wash/60 border border-sienna/20 mb-5 text-left">
+                          <Sparkles className="w-4 h-4 text-sienna flex-shrink-0 mt-0.5" />
+                          <p className="text-xs text-smoke leading-relaxed">
+                            <strong className="text-alabaster font-semibold">Next step:</strong> Our AI will scan your PDF and automatically generate multiple-choice questions tailored to your material.
+                          </p>
+                        </div>
+
+                        <button onClick={() => selectedFile && setHostStep('config')} disabled={!selectedFile} className="btn-primary w-full">
+                          Continue <ArrowRight className="w-4 h-4" />
+                        </button>
+
+                        {/* Saved Quizzes Section */}
+                        {savedQuizzes.length > 0 && (
+                          <div className="mt-6 pt-6 border-t border-rim">
+                            <p className="text-[10px] uppercase tracking-widest font-semibold text-smoke mb-3">Or host a saved quiz</p>
+                            <div className="space-y-2">
+                              {savedQuizzes.map(quiz => (
+                                <div 
+                                  key={quiz.id} 
+                                  className="flex items-center justify-between p-3 rounded-xl border border-rim hover:border-sienna transition-colors bg-canvas cursor-pointer" 
+                                  onClick={() => onHostSavedQuiz?.(quiz)}
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-lg bg-sienna/10 flex items-center justify-center">
+                                      <BookOpen className="w-4 h-4 text-sienna" />
+                                    </div>
+                                    <div className="text-left">
+                                      <p className="text-xs font-bold text-alabaster">{quiz.topic}</p>
+                                      <p className="text-[10px] text-smoke">{quiz.questions.length} questions</p>
+                                    </div>
+                                  </div>
+                                  <button className="btn-ghost !px-2 !py-1 text-xs text-sienna hover:bg-sienna/10">Host</button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </motion.div>
+
+                    ) : (
+                      <motion.div key="host-config" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}>
+                        {/* Step header */}
+                        <div className="flex items-center justify-between mb-5">
+                          <span className="text-xs font-bold uppercase tracking-wider text-smoke">Customize Parameters</span>
+                          <button onClick={() => setHostStep('upload')} className="text-xs font-medium text-smoke hover:text-sienna transition-colors flex items-center gap-1">
+                            <ChevronLeft className="w-3.5 h-3.5" /> Back to Upload
+                          </button>
+                        </div>
 
                   {/* File pill */}
                   <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-rim mb-6" style={{ background: 'var(--color-canvas)' }}>
@@ -423,11 +530,14 @@ export function HomeView({ onJoinGame, onHostGame, onHostSavedQuiz, uploadProgre
                     className="btn-primary w-full">
                     <Sparkles className="w-4 h-4" /> Generate {numQuestions} Questions
                   </button>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
 
         <p className="text-center text-xs mt-5 text-smoke">
           AI-powered · Developed by <span className="font-semibold text-alabaster">Chalana Dilshan</span>
