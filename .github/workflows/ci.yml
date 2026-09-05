@@ -90,5 +90,11 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Setup Mock Environment Files
+        run: |
+          cp .env.example .env
+          cp server/.env.example server/.env
+          echo "{}" > server/serviceAccountKey.json
+
       - name: Validate Docker Compose Configuration
         run: docker compose config
