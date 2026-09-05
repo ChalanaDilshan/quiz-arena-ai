@@ -493,6 +493,9 @@ const requireAgentAuth = async (req, res, next) => {
     return res.status(401).json({ error: 'Missing or invalid Authorization header' });
   }
   const token = authHeader.split('Bearer ')[1];
+  if (!adminAuth) {
+    return res.status(503).json({ error: 'Firebase Admin not configured on this instance' });
+  }
   try {
     const decoded = await adminAuth.verifyIdToken(token);
     // Email allowlist: if ADMIN_EMAILS is configured, reject unlisted accounts.

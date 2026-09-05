@@ -10,28 +10,46 @@ const __dirname = path.dirname(__filename);
 const serverPath = path.resolve(__dirname, '../index.js');
 
 const TEST_PORT = 3105;
+const BASE_URL = `http://127.0.0.1:${TEST_PORT}`;
 
 let serverProcess;
 
 function startServer() {
   return new Promise((resolve, reject) => {
+    let stderrOutput = '';
     serverProcess = spawn('node', [serverPath], {
       env: { ...process.env, PORT: String(TEST_PORT) },
       stdio: 'pipe',
     });
 
-    serverProcess.stdout.on('data', (d) => {
-      if (d.toString().includes('Quiz Arena API gateway running')) {
-        resolve();
+    serverProcess.stderr.on('data', (d) => {
+      stderrOutput += d.toString();
+    });
+
+    serverProcess.on('exit', (code) => {
+      if (code !== null && code !== 0) {
+        reject(new Error(`Server process exited with code ${code}. Stderr: ${stderrOutput}`));
       }
     });
 
-    serverProcess.stderr.on('data', (d) => {
-      // Ignore warnings
-    });
-
     serverProcess.on('error', reject);
-    setTimeout(resolve, 2000); // Fallback timeout
+
+    // Actively poll the health endpoint until responsive
+    const startTime = Date.now();
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`${BASE_URL}/health`);
+        if (res.ok) {
+          clearInterval(interval);
+          resolve();
+        }
+      } catch {
+        if (Date.now() - startTime > 8000) {
+          clearInterval(interval);
+          reject(new Error(`Server failed to start within 8s. Stderr: ${stderrOutput}`));
+        }
+      }
+    }, 150);
   });
 }
 
@@ -39,6 +57,31 @@ function stopServer() {
   if (serverProcess) {
     serverProcess.kill();
   }
+}
+
+function connectSocket() {
+  return new Promise((resolve, reject) => {
+    const socket = io(BASE_URL, {
+      transports: ['websocket', 'polling'],
+      reconnection: false,
+      timeout: 4000,
+    });
+    const timer = setTimeout(() => {
+      socket.disconnect();
+      reject(new Error('Socket connection timed out'));
+    }, 4000);
+
+    socket.on('connect', () => {
+      clearTimeout(timer);
+      resolve(socket);
+    });
+
+    socket.on('connect_error', (err) => {
+      clearTimeout(timer);
+      socket.disconnect();
+      reject(err);
+    });
+  });
 }
 
 test('Gateway Test Suite', async (t) => {
@@ -49,7 +92,7 @@ test('Gateway Test Suite', async (t) => {
   });
 
   await t.test('GET /health returns 200 with service metadata', async () => {
-    const res = await fetch(`http://localhost:${TEST_PORT}/health`);
+    const res = await fetch(`${BASE_URL}/health`);
     assert.equal(res.status, 200);
     const data = await res.json();
     assert.equal(data.status, 'healthy');
@@ -59,15 +102,14 @@ test('Gateway Test Suite', async (t) => {
   });
 
   await t.test('GET /api/health responds with identical health contract', async () => {
-    const res = await fetch(`http://localhost:${TEST_PORT}/api/health`);
+    const res = await fetch(`${BASE_URL}/api/health`);
     assert.equal(res.status, 200);
     const data = await res.json();
     assert.equal(data.status, 'healthy');
   });
 
   await t.test('hostGame generates unique hostToken and establishes lobby', async () => {
-    const socket = io(`http://localhost:${TEST_PORT}`);
-    await new Promise((r) => socket.on('connect', r));
+    const socket = await connectSocket();
 
     const pin = '112233';
     const mockQuiz = {
@@ -93,8 +135,7 @@ test('Gateway Test Suite', async (t) => {
   });
 
   await t.test('reconnectHost restores host socket binding and cancels cleanup', async () => {
-    const socket1 = io(`http://localhost:${TEST_PORT}`);
-    await new Promise((r) => socket1.on('connect', r));
+    const socket1 = await connectSocket();
 
     const pin = '445566';
     const mockQuiz = {
@@ -115,8 +156,7 @@ test('Gateway Test Suite', async (t) => {
     socket1.disconnect();
 
     // New socket connecting after page refresh
-    const socket2 = io(`http://localhost:${TEST_PORT}`);
-    await new Promise((r) => socket2.on('connect', r));
+    const socket2 = await connectSocket();
     assert.notEqual(socket2.id, socket1.id, 'New socket must have distinct socket ID');
 
     const reconnectedPromise = new Promise((resolve) => {
@@ -148,8 +188,7 @@ test('Gateway Test Suite', async (t) => {
   });
 
   await t.test('reconnectHost rejects invalid host tokens', async () => {
-    const socket = io(`http://localhost:${TEST_PORT}`);
-    await new Promise((r) => socket.on('connect', r));
+    const socket = await connectSocket();
 
     const errorPromise = new Promise((resolve) => {
       socket.on('error', resolve);
