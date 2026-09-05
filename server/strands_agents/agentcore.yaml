@@ -1,0 +1,122 @@
+# =============================================================================
+# Amazon Bedrock AgentCore — Deployment Specification Manifest
+# Quiz Arena: Strands Agents SDK Runtime & Orchestration
+# =============================================================================
+
+version: "1.0"
+metadata:
+  name: "quiz-arena-strands-agents"
+  description: "High-performance AI multi-agent backend powered by Strands Agents SDK on Amazon Bedrock AgentCore"
+  author: "Chalana Dilshan"
+  repository: "https://github.com/ChalanaDilshan/quiz-arena-ai"
+
+runtime:
+  platform: "bedrock-agentcore-runtime"
+  engine: "python"
+  version: "3.11"
+  entrypoint: "main:app"
+  framework: "strands-agents"
+  transport: "fastapi"
+  port: 8001
+  container:
+    dockerfile: "Dockerfile.agentcore"
+    architecture: "linux/amd64"
+    health_check:
+      path: "/health"
+      interval_seconds: 15
+      timeout_seconds: 5
+      healthy_threshold: 2
+
+# -----------------------------------------------------------------------------
+# Strands Agents Declared within the AgentCore Runtime
+# -----------------------------------------------------------------------------
+agents:
+  # Agent 1: Live Game Commentator
+  - id: "commentator"
+    name: "CommentatorAgent"
+    role: "Energetic game-show host delivering real-time commentary on player events"
+    model:
+      provider: "bedrock"
+      model_id: "anthropic.claude-3-5-sonnet-20241022-v2:0"
+      temperature: 0.85
+      max_tokens: 250
+    tools:
+      - name: "receive_game_event"
+        description: "Receive real-time game telemetry (streaks, score deltas, question reveals)"
+
+  # Agent 2: Multi-Turn Socratic Tutor
+  - id: "tutor"
+    name: "TutorAgent"
+    role: "Post-match interactive tutor ('Professor Q') explaining mistakes and concepts"
+    model:
+      provider: "bedrock"
+      model_id: "anthropic.claude-3-5-sonnet-20241022-v2:0"
+      temperature: 0.7
+      max_tokens: 600
+    memory:
+      provider: "agentcore_memory"
+      strategies:
+        - "semantic"
+        - "summarization"
+      session_ttl_seconds: 3600
+      max_turns: 20
+
+  # Agent 3: Autonomous Syllabus Scanner
+  - id: "syllabus"
+    name: "SyllabusAgent"
+    role: "Autonomous agent that scans course syllabi, detects upcoming topics, and compiles quizzes"
+    model:
+      provider: "bedrock"
+      model_id: "anthropic.claude-3-5-sonnet-20241022-v2:0"
+      temperature: 0.2
+      max_tokens: 1500
+    tools:
+      - name: "list_syllabus_files"
+        description: "List available syllabus documents in S3 or local directory"
+      - name: "read_syllabus_file"
+        description: "Read and extract sanitized content from a syllabus document"
+      - name: "list_existing_quizzes"
+        description: "Check for duplicate quizzes to prevent redundant generation"
+      - name: "save_quiz_draft"
+        description: "Persist approved or pending quiz drafts"
+
+  # Agent 4: In-Game Hint Master
+  - id: "hint_master"
+    name: "HintMasterAgent"
+    role: "Cryptic in-game hint provider giving subtle non-spoiler clues"
+    model:
+      provider: "bedrock"
+      model_id: "anthropic.claude-3-5-sonnet-20241022-v2:0"
+      temperature: 0.75
+      max_tokens: 180
+    tools:
+      - name: "analyze_question"
+        description: "Analyze question and answer options to formulate a leading clue"
+
+  # Agent 5: Live Quiz Generator
+  - id: "quiz_generator"
+    name: "QuizGeneratorAgent"
+    role: "Generates curriculum-aligned multiple-choice questions from lecture notes or topics"
+    model:
+      provider: "bedrock"
+      model_id: "anthropic.claude-3-5-sonnet-20241022-v2:0"
+      temperature: 0.4
+      max_tokens: 2000
+
+# -----------------------------------------------------------------------------
+# AgentCore Gateway & Identity
+# -----------------------------------------------------------------------------
+gateway:
+  auth_type: "internal_shared_secret"
+  header: "X-Internal-Token"
+  rate_limit:
+    requests_per_minute: 120
+    burst: 30
+
+# -----------------------------------------------------------------------------
+# Storage & Knowledge Integration
+# -----------------------------------------------------------------------------
+storage:
+  s3_bucket_env: "AWS_S3_BUCKET_NAME"
+  syllabi_prefix: "syllabi/"
+  quizzes_prefix: "quizzes/"

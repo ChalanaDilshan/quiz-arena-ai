@@ -2,19 +2,19 @@
 
 <div align="center">
 
-![Quiz Arena AI](https://img.shields.io/badge/AWS%20Strands%20SDK-Powered-orange?style=for-the-badge&logo=amazon-aws)
-![Gemini 2.5 Flash](https://img.shields.io/badge/Gemini%202.5%20Flash-Model-blue?style=for-the-badge&logo=google)
+![AWS Strands Agents SDK](https://img.shields.io/badge/Strands%20Agents%20SDK-AWS%20Native-orange?style=for-the-badge&logo=amazon-aws)
+![Amazon Bedrock](https://img.shields.io/badge/Amazon%20Bedrock-Claude%203.5%20%2F%20Nova-232F3E?style=for-the-badge&logo=amazonaws)
+![Bedrock AgentCore](https://img.shields.io/badge/Bedrock%20AgentCore-Serverless%20Runtime-blueviolet?style=for-the-badge&logo=amazon-aws)
 ![React](https://img.shields.io/badge/React%2018-Frontend-61DAFB?style=for-the-badge&logo=react)
 ![Node.js](https://img.shields.io/badge/Node.js-Gateway-339933?style=for-the-badge&logo=node.js)
 ![Python](https://img.shields.io/badge/Python%203.11-Agents-3776AB?style=for-the-badge&logo=python)
-![Firebase](https://img.shields.io/badge/Firebase-Auth-FFCA28?style=for-the-badge&logo=firebase)
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge&logo=docker)
 
-**A real-time, AI-powered competitive quiz platform driven by four autonomous Strands SDK agents.**
+**A real-time, competitive quiz arena powered by five Strands Agents SDK agents orchestrated on Amazon Bedrock AgentCore.**
 
-*Built for the "Agents for Humans" Hackathon — where AI handles the repetitive so humans can focus on what matters.*
+*Built for the AWS & AI Agents Hackathon — where intelligent multi-agent systems handle live commentary, tutoring, clue generation, and automated syllabus compilation.*
 
-[Features](#features) · [Architecture](#architecture) · [The Agents](#the-four-strands-agents) · [Quick Start](#quick-start) · [Docker](#docker-deployment) · [Security](#security) · [API Reference](#api-reference)
+[Features](#features) · [Architecture](#architecture) · [The Agents](#the-five-strands-agents) · [Bedrock AgentCore Deployment](#bedrock-agentcore-deployment) · [Quick Start](#quick-start) · [Security](#security--adversarial-hardening) · [API Reference](#api-reference)
 
 </div>
 
@@ -24,23 +24,22 @@
 
 | Feature | Description |
 |---|---|
-| **4 Strands SDK Agents** | Commentator, Tutor, Syllabus Generator, and Hint Master — all powered by Gemini 2.5 Flash |
-| **Real-time Multiplayer** | WebSocket-driven live game rooms via Socket.IO — scores update instantly for all players |
-| **Live Hint System** | AI Hint Master gives players a cryptic, non-spoiler clue mid-question on demand |
-| **AI Tutor (Post-Game)** | Multi-turn "Professor Q" tutoring session for every wrong answer with full conversation history |
-| **AI Game Commentator** | Live event-driven agent that reacts to streaks, scores, and dramatic moments with energetic commentary |
-| **Autonomous Quiz Generator** | Syllabus Agent scans uploaded files, generates a 5-question quiz, and awaits teacher approval |
-| **Admin Dashboard** | Full analytics, quiz history, export to CSV/PDF, and approve/reject AI-generated quizzes |
-| **Firebase Authentication** | Secure JWT-protected admin and agent endpoints |
-| **One-Command Docker Deployment** | `docker compose up` starts all three services |
-| **QR Code Lobby Join** | Players scan a QR code on mobile to join instantly — no typing required |
-| **Live Leaderboard** | Animated podium and per-player stats after every question |
+| **5 Strands SDK Agents** | Commentator, Tutor, Syllabus Scanner, Hint Master, and Live Quiz Generator powered by **Amazon Bedrock** (`BedrockModel` with Claude 3.5 Sonnet & Nova Pro) |
+| **Amazon Bedrock AgentCore** | Deployment-ready on AWS Bedrock AgentCore with `agentcore.yaml`, managed memory, and container runtime specs |
+| **Real-time Multiplayer** | Low-latency WebSocket room registry via Socket.IO with state reconciliation and live leaderboard synchronization |
+| **Live Hint System** | AI Hint Master leverages tool-calling to evaluate options and deliver subtle, Socratic hints without spoiling answers |
+| **AI Tutor (Professor Q)** | Multi-turn post-match tutor with conversational memory explaining mistakes and exploring underlying concepts |
+| **AI Game Commentator** | Low-latency host reacting dynamically to player streaks, comebacks, and podium shifts |
+| **Autonomous Syllabus Agent** | Autonomous multi-tool loop that scans course documents, checks for duplicate topics, and generates quizzes |
+| **Live AI Quiz Generation** | Real-time curriculum generation from uploaded PDFs or custom course outlines via Strands agents |
+| **Host Session Resumption** | Cryptographic host-reconnection protocol preventing host lockouts upon page refresh |
+| **Enterprise Security** | Defense-in-depth architecture: internal shared secret (`X-Internal-Token`), regex path-traversal protection, and anti-cheat answer masking |
 
 ---
 
 ## Architecture
 
-Quiz Arena uses a **three-tier, two-process** architecture that cleanly separates AI reasoning from public web routing:
+Quiz Arena utilizes a decoupled, secure three-tier architecture that isolates the AI reasoning microservice behind a hardened API Gateway:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -54,150 +53,110 @@ Quiz Arena uses a **three-tier, two-process** architecture that cleanly separate
 │                                                                 │
 │  ┌──────────────────────────────────────────────────────────┐   │
 │  │              SOCKET.IO ROOM REGISTRY                     │   │
-│  │  Manages live game rooms, real-time scoring, timers      │   │
+│  │  Manages live rooms, anti-cheat masking, host tokens     │   │
 │  └──────────────────────────────────────────────────────────┘   │
 └───────────────────────────┬─────────────────────────────────────┘
-                            │  Internal HTTP (localhost only)
+                            │  Internal HTTP (X-Internal-Token)
 ┌───────────────────────────▼─────────────────────────────────────┐
-│          PYTHON STRANDS MICROSERVICE  (port 8001)               │
-│         FastAPI · AWS Strands SDK · Gemini 2.5 Flash            │
+│         AMAZON BEDROCK AGENTCORE RUNTIME  (port 8001)           │
+│         FastAPI · Strands Agents SDK · Amazon Bedrock           │
 │                                                                 │
 │  ┌────────────────┐  ┌────────────────┐  ┌──────────────────┐   │
 │  │  Commentator   │  │  Tutor Agent   │  │  Syllabus Agent  │   │
-│  │    Agent       │  │ (session-aware)│  │  (autonomous)    │   │
+│  │     Agent      │  │ (AgentCore Mem)│  │   (Autonomous)   │   │
 │  └────────────────┘  └────────────────┘  └──────────────────┘   │
-│  ┌────────────────┐                                             │
-│  │  Hint Master   │                                             │
-│  │    Agent       │                                             │
-│  └────────────────┘                                             │
+│  ┌────────────────┐  ┌────────────────┐                         │
+│  │  Hint Master   │  │ Quiz Generator │                         │
+│  │     Agent      │  │     Agent      │                         │
+│  └────────────────┘  └────────────────┘                         │
 └───────────────────────────┬─────────────────────────────────────┘
-                            │
+                            │  boto3 / ConverseStream
         ┌───────────────────┴──────────────────┐
         │                                      │
-┌───────▼────────┐                   ┌─────────▼────────┐
-│  Local Storage │                   │    AWS S3 Bucket  │
-│  (dev fallback)│                   │   (production)    │
-│  /syllabi      │                   │  syllabi/ prefix  │
-│  /quizzes      │                   │  quizzes/ prefix  │
-└────────────────┘                   └──────────────────┘
+┌───────▼────────────────────────┐   ┌─────────▼────────┐
+│     Amazon Bedrock Models      │   │    AWS S3 Bucket │
+│ Claude 3.5 Sonnet / Nova Pro   │   │  syllabi/ quizzes│
+└────────────────────────────────┘   └──────────────────┘
 ```
-
-### Key Design Decisions
-
-- **Python ↔ Node.js separation**: The Strands SDK runs in Python. The Node.js gateway handles all public internet traffic (CORS, auth, rate limiting) and only proxies agent calls to the internal Python service — it is never exposed directly.
-- **AWS S3 dual-mode storage**: The Syllabus Agent stores syllabi and generated quizzes in **AWS S3** when `AWS_S3_BUCKET_NAME` is set, falling back to the local filesystem for development.
-- **Firebase JWT for admin routes**: The `/api/agent/*` admin routes require a valid Firebase ID token, protecting the autonomous agent trigger from public access.
-- **In-memory hint rate limiting**: A `Set` tracks `roomPin:playerId:questionIndex` keys to enforce one hint per player per question without any database dependency.
 
 ---
 
-## The Four Strands Agents
+## The Five Strands Agents
 
-All agents are implemented in [`server/strands_agents/main.py`](./server/strands_agents/main.py) using the `strands-agents[gemini]` SDK with `GeminiModel(model_id="gemini-2.5-flash")`.
+All agents are implemented in [`server/strands_agents/main.py`](./server/strands_agents/main.py) using the native **Strands Agents SDK** (`strands-agents`) bound to **Amazon Bedrock**:
+
+```python
+from strands import Agent
+from strands.models import BedrockModel
+
+# Native Amazon Bedrock model instantiation
+model = BedrockModel(
+    model_id=os.environ.get("BEDROCK_MODEL_ID", "anthropic.claude-3-5-sonnet-20241022-v2:0"),
+    region_name=os.environ.get("AWS_REGION", "us-east-1"),
+    temperature=0.7
+)
+```
 
 ---
 
 ### 1. Commentator Agent — *Event-Driven Live Host*
+Reacts to real-time gameplay events with punchy, high-energy game-show commentary.
+- **Strands Pattern**: Tool-calling agent invoking the `receive_game_event` tool before generating commentary.
+- **Endpoint**: `POST /api/commentary`
 
-Reacts to live game events and delivers punchy 1-2 sentence commentary to keep energy high.
+### 2. Tutor Agent (Professor Q) — *Multi-Turn Socratic Tutor*
+Guides students through misconceptions after a match, maintaining conversation history across multiple turns.
+- **Strands Pattern**: Stateful multi-turn agent with AgentCore Memory retention.
+- **Endpoint**: `POST /api/tutor/explain`
 
-**Strands Pattern:** Tool-calling agent — must call `receive_game_event` tool before generating commentary.
+### 3. Syllabus Agent — *Autonomous Agent with 4 Real Tools*
+Autonomously scans course syllabi, detects upcoming topics, avoids duplicates, and compiles quiz drafts.
+- **Strands Pattern**: Autonomous multi-step agentic loop with tools (`list_syllabus_files`, `read_syllabus_file`, `list_existing_quizzes`, `save_quiz_draft`).
+- **Human-in-the-Loop**: Generated drafts are marked `pending_approval` until approved via Admin Dashboard.
+- **Endpoint**: `POST /api/agent/trigger`
 
-**Tool:**
-```python
-@tool
-def receive_game_event(event_type: str, player_name: str, context: str) -> str:
-    """Receive a live game event and return structured context for the host."""
-```
+### 4. Hint Master Agent — *Subtle In-Game Clue Provider*
+Provides Socratic, non-spoiler hints during live questions.
+- **Strands Pattern**: Tool-calling agent that calls `analyze_question` to evaluate distractors before formulating a clue.
+- **Endpoint**: `POST /api/hint`
 
-**Triggered by:** `POST /api/commentary` — fired automatically on hot streaks, cold streaks, and question reveals.
-
-**Events handled:** `HOT_STREAK`, `COLD_STREAK`, `QUESTION_REVEALED`, and more.
-
----
-
-### 2. Tutor Agent (Professor Q) — *Session-Aware Multi-turn Tutor*
-
-A warm, patient post-game tutor that explains wrong answers and handles follow-up questions across multiple conversation turns.
-
-**Strands Pattern:** Stateful multi-turn agent — conversation history is persisted server-side using Strands' `messages=` parameter.
-
-```python
-# Strands manages conversation context automatically
-agent = Agent(
-    model=make_gemini_model(temperature=0.7),
-    system_prompt=TUTOR_PROMPT,
-    messages=history or [],   # ← Prior turns injected here
-)
-_tutor_sessions[session_id] = agent.messages  # ← Saved after each turn
-```
-
-**Triggered by:** `POST /api/tutor/explain` — when a player clicks "Ask Professor Q" on the Game Over screen.
+### 5. Quiz Generator Agent — *Curriculum Compiler*
+Compiles balanced, challenging quizzes from lecture notes or syllabus topics in real time.
+- **Strands Pattern**: Structured curriculum synthesis returning verified JSON question arrays.
+- **Endpoint**: `POST /api/generate-quiz`
 
 ---
 
-### 3. Syllabus Agent — *Fully Autonomous with 4 Real Tools*
+## Bedrock AgentCore Deployment
 
-An autonomous agent that runs a complete multi-step workflow without human intervention until approval is needed.
+Quiz Arena is configured for serverless production deployment on **Amazon Bedrock AgentCore**:
 
-**Strands Pattern:** Autonomous agentic loop with real tool use and human-in-the-loop checkpoint.
+- **AgentCore Manifest**: [`server/strands_agents/agentcore.yaml`](./server/strands_agents/agentcore.yaml)
+- **AgentCore CLI Config**: [`server/strands_agents/agentcore.json`](./server/strands_agents/agentcore.json)
+- **MicroVM Container**: [`server/strands_agents/Dockerfile.agentcore`](./server/strands_agents/Dockerfile.agentcore)
+- **CloudFormation Infrastructure**: [`infrastructure/agentcore-stack.yaml`](./infrastructure/agentcore-stack.yaml)
+- **Architecture Guide**: [`docs/BEDROCK_AGENTCORE_ARCHITECTURE.md`](./docs/BEDROCK_AGENTCORE_ARCHITECTURE.md)
 
-**4 Real Tools:**
-
-| Tool | Description |
-|---|---|
-| `list_syllabus_files()` | Lists `.txt` files from S3 or local `/syllabi` dir |
-| `read_syllabus_file(filename)` | Safely reads a syllabus file (path-traversal protected) |
-| `list_existing_quizzes()` | Checks for duplicate quiz topics before generating |
-| `save_quiz_draft(topic, questions_json)` | Persists the generated quiz as `pending_approval` |
-
-**Autonomous Workflow:**
-```
-1. list_syllabus_files()        → Discover available content
-2. read_syllabus_file(...)      → Understand the topic
-3. list_existing_quizzes()      → Prevent duplicates
-4. Generate 5-question quiz     → Pure LLM reasoning
-5. save_quiz_draft(...)         → Save as "pending_approval"
-          ↓
-   HUMAN CHECKPOINT: Teacher reviews & approves on Admin Dashboard
-          ↓
-6. POST /api/agent/approve      → Status updated to "approved"
+### Deploy via AgentCore CLI
+```bash
+npm install -g @aws/agentcore
+cd server/strands_agents
+agentcore deploy --config agentcore.yaml --region us-east-1
 ```
 
-**Triggered by:** `POST /api/agent/trigger` (Firebase-protected admin route).
-
----
-
-### 4. Hint Master Agent — *Live In-Game Subtle Clue Provider*
-
-Gives players one Socratic, non-spoiler hint per question when they're stuck. Never reveals the answer — only nudges.
-
-**Strands Pattern:** Tool-calling agent — must call `analyze_question` tool before crafting the hint.
-
-**Tool:**
-```python
-@tool
-def analyze_question(question_text: str, options: str) -> str:
-    """Study the question and options before crafting a hint."""
-```
-
-**System Prompt Excerpt:**
-> *"DO NOT mention the correct answer or its label (A, B, C, D). Use an analogy, a real-world fact, or a leading question as your clue."*
-
-**Rate limiting:** One hint per player per question, enforced at the Node.js gateway layer using an in-memory `Set`.
-
-**Triggered by:** `POST /api/hint` — when a player clicks "Need a Hint?" during a live question.
+Or deploy using the included automation scripts:
+- Linux / macOS: `./server/strands_agents/deploy_agentcore.sh`
+- Windows PowerShell: `.\server\strands_agents\deploy_agentcore.ps1`
 
 ---
 
 ## Quick Start
 
 ### Prerequisites
-
-- **Node.js** v18+ 
+- **Node.js** v18+
 - **Python** 3.10+
-- **Google Gemini API Key** — [Get one free](https://aistudio.google.com/app/apikey)
-- **Firebase Project** — [Create one](https://console.firebase.google.com/) for auth features (optional for mock mode)
+- **AWS Account** with Amazon Bedrock model access (Anthropic Claude 3.5 Sonnet / Amazon Nova Pro)
+- **Docker & Docker Compose** (optional, for containerized run)
 
 ### 1. Clone & Configure
 
@@ -208,14 +167,13 @@ cd quiz-arena-ai
 
 **`server/.env`** (copy from `server/.env.example`):
 ```env
-GEMINI_API_KEY=your_gemini_api_key_here
+AWS_REGION=us-east-1
+AWS_ACCESS_KEY_ID=your_aws_access_key
+AWS_SECRET_ACCESS_KEY=your_aws_secret_key
+BEDROCK_MODEL_ID=anthropic.claude-3-5-sonnet-20241022-v2:0
 PORT=3001
 STRANDS_URL=http://127.0.0.1:8001
 INTERNAL_SECRET=your_32_char_random_hex_secret
-
-# Optional: AWS S3 for syllabus/quiz storage (falls back to local disk)
-AWS_S3_BUCKET_NAME=your-bucket-name
-AWS_REGION=us-east-1
 ```
 
 **`.env`** (root directory, copy from `.env.example`):

@@ -97,6 +97,8 @@ test('Gateway Test Suite', async (t) => {
     const data = await res.json();
     assert.equal(data.status, 'healthy');
     assert.equal(data.service, 'quiz-arena-gateway');
+    assert.equal(data.aiFramework, 'Strands Agents SDK');
+    assert.equal(data.modelProvider, 'Amazon Bedrock');
     assert.ok(typeof data.uptime === 'number');
     assert.ok(typeof data.activeRooms === 'number');
   });
@@ -106,6 +108,8 @@ test('Gateway Test Suite', async (t) => {
     assert.equal(res.status, 200);
     const data = await res.json();
     assert.equal(data.status, 'healthy');
+    assert.equal(data.aiFramework, 'Strands Agents SDK');
+    assert.equal(data.modelProvider, 'Amazon Bedrock');
   });
 
   await t.test('hostGame generates unique hostToken and establishes lobby', async () => {

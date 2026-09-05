@@ -1,0 +1,34 @@
+# =============================================================================
+# Amazon Bedrock AgentCore — Production MicroVM Container
+# =============================================================================
+FROM python:3.11-slim
+
+LABEL maintainer="Chalana Dilshan"
+LABEL description="Quiz Arena Strands Agents on Amazon Bedrock AgentCore Runtime"
+LABEL org.opencontainers.image.source="https://github.com/ChalanaDilshan/quiz-arena-ai"
+
+# Install curl for container health check
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Copy source code and AgentCore manifests
+COPY . .
+
+# Create fallback directories
+RUN mkdir -p /app/syllabi /app/quizzes
+
+EXPOSE 8001
+
+HEALTHCHECK --interval=20s --timeout=5s --start-period=10s --retries=3 \
+  CMD curl -f http://127.0.0.1:8001/health || exit 1
+
+# Production AgentCore container entrypoint
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001", "--workers", "2"]

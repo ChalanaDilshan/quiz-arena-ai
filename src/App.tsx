@@ -73,7 +73,7 @@ function App() {
       if (import.meta.env.VITE_USE_MOCK === 'false') return false;
       if (import.meta.env.VITE_USE_MOCK === 'true') return true;
     } catch {}
-    return true; // Default fallback to mock mode for offline demo
+    return false; // Default to live mode so Strands Agents on Bedrock are actively used
   })();
 
   const game = useQuizGame(isMockMode);

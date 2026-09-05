@@ -1,0 +1,24 @@
+{
+  "$schema": "https://raw.githubusercontent.com/aws/agentcore/main/schema/agentcore.schema.json",
+  "name": "quiz-arena-strands-agents",
+  "version": "1.0.0",
+  "framework": "strands-agents",
+  "runtime": {
+    "type": "container",
+    "pythonVersion": "3.11",
+    "entrypoint": "main:app",
+    "port": 8001
+  },
+  "models": {
+    "default": "anthropic.claude-3-5-sonnet-20241022-v2:0",
+    "region": "us-east-1"
+  },
+  "memory": {
+    "enabled": true,
+    "store": "agentcore-managed-memory",
+    "strategies": ["semantic", "summarization"]
+  },
+  "security": {
+    "authHeader": "X-Internal-Token"
+  }
+}

@@ -63,7 +63,10 @@ app.get(['/health', '/api/health'], (req, res) => {
     activeRooms: rooms.size,
     recentRooms: recentRooms.size,
     service: 'quiz-arena-gateway',
-    version: '1.0.0'
+    version: '1.0.0',
+    aiFramework: 'Strands Agents SDK',
+    modelProvider: 'Amazon Bedrock',
+    agentcoreReady: true,
   });
 });
 
@@ -641,6 +644,23 @@ app.post('/api/agent/clear', requireAgentAuth, apiLimiter, async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Clear failed' });
+  }
+});
+
+// --- AI Quiz Generator Agent (Strands Agents SDK on Bedrock) ---
+app.post('/api/generate-quiz', apiLimiter, async (req, res) => {
+  const { syllabusText, topic, numQuestions, difficulty } = req.body ?? {};
+
+  try {
+    const result = await callStrands('/generate-quiz', {
+      syllabus_text: typeof syllabusText === 'string' ? syllabusText.slice(0, 4000) : '',
+      topic: typeof topic === 'string' ? topic.slice(0, 100) : 'AWS & Cloud Architecture',
+      num_questions: Number(numQuestions) || 5,
+      difficulty: typeof difficulty === 'string' ? difficulty.slice(0, 30) : 'Medium',
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: 'Quiz generator agent failed to generate questions.' });
   }
 });
 

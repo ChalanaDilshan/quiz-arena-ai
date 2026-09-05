@@ -1,4 +1,4 @@
-strands-agents[gemini]
+strands-agents
 strands-agents-tools
 fastapi
 uvicorn[standard]

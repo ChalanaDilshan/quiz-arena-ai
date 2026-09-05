@@ -1,0 +1,119 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Amazon Bedrock AgentCore Infrastructure Stack for Quiz Arena Strands Agents"
+
+Parameters:
+  Environment:
+    Type: String
+    Default: "production"
+    AllowedValues: ["development", "staging", "production"]
+    Description: "Deployment environment stage"
+
+  BedrockModelId:
+    Type: String
+    Default: "anthropic.claude-3-5-sonnet-20241022-v2:0"
+    Description: "Amazon Bedrock Model ID to authorize for Strands Agents"
+
+  InternalSecret:
+    Type: String
+    NoEcho: true
+    Description: "Shared internal secret token for Gateway -> Strands AgentCore authentication"
+
+Resources:
+  # ---------------------------------------------------------------------------
+  # S3 Bucket for Course Syllabi and Generated Quiz Store
+  # ---------------------------------------------------------------------------
+  QuizStorageBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "quiz-arena-data-${AWS::AccountId}-${AWS::Region}"
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+
+  # ---------------------------------------------------------------------------
+  # IAM Execution Role for Bedrock AgentCore Runtime
+  # ---------------------------------------------------------------------------
+  AgentCoreExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "QuizArena-AgentCore-ExecutionRole-${Environment}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - bedrock.amazonaws.com
+                - ecs-tasks.amazonaws.com
+            Action: "sts:AssumeRole"
+      Policies:
+        - PolicyName: "BedrockModelInvocationPolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "bedrock:InvokeModel"
+                  - "bedrock:InvokeModelWithResponseStream"
+                  - "bedrock:Converse"
+                  - "bedrock:ConverseStream"
+                Resource:
+                  - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/${BedrockModelId}"
+                  - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/*"
+        - PolicyName: "S3KnowledgeStoragePolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "s3:GetObject"
+                  - "s3:PutObject"
+                  - "s3:DeleteObject"
+                  - "s3:ListBucket"
+                Resource:
+                  - !GetAtt QuizStorageBucket.Arn
+                  - !Sub "${QuizStorageBucket.Arn}/*"
+        - PolicyName: "CloudWatchLogsPolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "logs:CreateLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource: "arn:aws:logs:*:*:*"
+
+  # ---------------------------------------------------------------------------
+  # CloudWatch Log Group for Agent Observability & Tracing
+  # ---------------------------------------------------------------------------
+  AgentCoreLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/bedrock/agentcore/quiz-arena-${Environment}"
+      RetentionInDays: 30
+
+Outputs:
+  StorageBucketName:
+    Description: "S3 Bucket for syllabi and quizzes"
+    Value: !Ref QuizStorageBucket
+    Export:
+      Name: !Sub "${AWS::StackName}-StorageBucket"
+
+  ExecutionRoleArn:
+    Description: "IAM Role ARN for Bedrock AgentCore execution"
+    Value: !GetAtt AgentCoreExecutionRole.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-ExecutionRoleArn"
+
+  LogGroupName:
+    Description: "CloudWatch Log Group for AgentCore observability"
+    Value: !Ref AgentCoreLogGroup
