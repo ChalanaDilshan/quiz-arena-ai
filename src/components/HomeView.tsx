@@ -38,6 +38,7 @@ export function HomeView({ onJoinGame, onHostGame, onHostSavedQuiz, uploadProgre
   const [nickname, setNickname] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
   const [hostStep, setHostStep] = useState<'upload' | 'config'>('upload');
   const [numQuestions, setNumQuestions] = useState(10);
   const [difficulty, setDifficulty] = useState<Difficulty>('Medium');
@@ -83,9 +84,9 @@ export function HomeView({ onJoinGame, onHostGame, onHostSavedQuiz, uploadProgre
     if (f) {
       if (f.type === 'application/pdf' && f.name.toLowerCase().endsWith('.pdf')) {
         setSelectedFile(f);
-        setError(null);
+        setFileError(null);
       } else {
-        setError('Only PDF files are allowed.');
+        setFileError('Only PDF files are allowed.');
       }
     }
   };
@@ -94,9 +95,9 @@ export function HomeView({ onJoinGame, onHostGame, onHostSavedQuiz, uploadProgre
     if (f) {
       if (f.type === 'application/pdf' && f.name.toLowerCase().endsWith('.pdf')) {
         setSelectedFile(f);
-        setError(null);
+        setFileError(null);
       } else {
-        setError('Only PDF files are allowed.');
+        setFileError('Only PDF files are allowed.');
       }
     }
   };
@@ -150,14 +151,14 @@ export function HomeView({ onJoinGame, onHostGame, onHostSavedQuiz, uploadProgre
           <div className="p-5">
             {/* Error */}
             <AnimatePresence>
-              {error && (
+              {(error || fileError) && (
                 <motion.div
                   initial={{ opacity: 0, height: 0, marginBottom: 0 }}
                   animate={{ opacity: 1, height: 'auto', marginBottom: 16 }}
                   exit={{ opacity: 0, height: 0, marginBottom: 0 }}
                   className="px-4 py-3 rounded-lg text-sm font-medium badge !rounded-lg !px-4 !py-3"
                 >
-                  {error}
+                  {error || fileError}
                 </motion.div>
               )}
             </AnimatePresence>

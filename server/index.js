@@ -320,6 +320,37 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on('kickPlayer', ({ pin, targetPlayerId }) => {
+    const room = rooms.get(pin);
+    if (room && room.hostSocket === socket.id) {
+      const targetIndex = room.players.findIndex(p => p.id === targetPlayerId);
+      if (targetIndex !== -1) {
+        const targetPlayer = room.players[targetIndex];
+        room.players.splice(targetIndex, 1);
+        if (targetPlayer.socketId) {
+          io.to(targetPlayer.socketId).emit('kicked');
+        }
+        broadcastState(pin);
+      }
+    }
+  });
+
+  socket.on('editNickname', ({ pin, newNickname }) => {
+    const room = rooms.get(pin);
+    if (room) {
+      const cleanNickname = sanitizeNickname(newNickname);
+      if (!cleanNickname) {
+        socket.emit('error', 'Invalid nickname. Must be 1-24 valid characters without HTML or control characters.');
+        return;
+      }
+      const player = room.players.find(p => p.id === socket.playerId);
+      if (player) {
+        player.nickname = cleanNickname;
+        broadcastState(pin);
+      }
+    }
+  });
+
   socket.on('disconnect', () => {
     // Cleanup zombie rooms to prevent memory leaks if host disconnects
     for (const [pin, room] of rooms.entries()) {

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Copy, Users, Play, Loader2, Check, QrCode, Link as LinkIcon, Sparkles } from 'lucide-react';
+import { Copy, Users, Play, Loader2, Check, QrCode, Link as LinkIcon, Sparkles, X, Edit2 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import type { Player } from '../types';
 
@@ -8,13 +8,18 @@ interface LobbyViewProps {
   roomPin: string;
   players: Player[];
   isHost: boolean;
+  currentUserId: string;
   onStartGame: () => void;
+  onKickPlayer?: (playerId: string) => void;
+  onEditNickname?: (newNickname: string) => void;
 }
 
-export function LobbyView({ roomPin, players, isHost, onStartGame }: LobbyViewProps) {
+export function LobbyView({ roomPin, players, isHost, currentUserId, onStartGame, onKickPlayer, onEditNickname }: LobbyViewProps) {
   const [copiedPin, setCopiedPin] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [showQrModal, setShowQrModal] = useState(false);
+  const [editingNickname, setEditingNickname] = useState(false);
+  const [tempNickname, setTempNickname] = useState('');
 
   const joinUrl = typeof window !== 'undefined'
     ? `${window.location.origin}/?pin=${roomPin}`
@@ -142,30 +147,90 @@ export function LobbyView({ roomPin, players, isHost, onStartGame }: LobbyViewPr
                 Connected Participants
               </span>
             </div>
-            <span className="badge">{players.length} players joined</span>
+            <span className="badge">{players.length} / 50 joined</span>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 min-h-[140px]">
-            {players.map((player, i) => (
-              <motion.div
-                key={player.id}
-                initial={{ scale: 0.7, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ delay: i * 0.05, type: 'spring', stiffness: 300, damping: 24 }}
-                className="flex flex-col items-center gap-2 py-4 px-2 rounded-xl border border-rim transition-all hover:border-sienna/40 bg-canvas"
-              >
-                <div
-                  className="w-11 h-11 rounded-full flex items-center justify-center text-sm font-extrabold text-white shadow-sm"
-                  style={{ backgroundColor: player.avatarColor }}
+            {players.map((player, i) => {
+              const isMe = player.id === currentUserId;
+              return (
+                <motion.div
+                  key={player.id}
+                  initial={{ scale: 0.7, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ delay: i * 0.05, type: 'spring', stiffness: 300, damping: 24 }}
+                  className="relative flex flex-col items-center gap-2 py-4 px-2 rounded-xl border border-rim transition-all hover:border-sienna/40 bg-canvas group"
                 >
-                  {player.nickname[0].toUpperCase()}
-                </div>
-                <span className="text-xs font-semibold truncate w-full text-center text-alabaster">
-                  {player.nickname}
-                </span>
-                {player.isHost && <span className="badge text-[9px] !py-0 !px-1.5 font-bold">HOST</span>}
-              </motion.div>
-            ))}
+                  {/* Kick Button for Host */}
+                  {isHost && !player.isHost && (
+                    <button
+                      onClick={() => onKickPlayer?.(player.id)}
+                      className="absolute top-1.5 right-1.5 p-1 rounded-full bg-red-500/10 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/20"
+                      title="Kick Player"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+
+                  <div
+                    className="w-11 h-11 rounded-full flex items-center justify-center text-sm font-extrabold text-white shadow-sm"
+                    style={{ backgroundColor: player.avatarColor }}
+                  >
+                    {player.nickname[0]?.toUpperCase() || '?'}
+                  </div>
+
+                  {/* Nickname display / edit */}
+                  {isMe && editingNickname ? (
+                    <div className="flex items-center gap-1 w-full px-1">
+                      <input
+                        type="text"
+                        value={tempNickname}
+                        onChange={(e) => setTempNickname(e.target.value)}
+                        className="w-full text-xs font-semibold text-center bg-transparent border-b border-sienna text-alabaster focus:outline-none focus:border-sienna min-w-0"
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            onEditNickname?.(tempNickname);
+                            setEditingNickname(false);
+                          } else if (e.key === 'Escape') {
+                            setEditingNickname(false);
+                          }
+                        }}
+                      />
+                      <button
+                        onClick={() => {
+                          onEditNickname?.(tempNickname);
+                          setEditingNickname(false);
+                        }}
+                        className="text-emerald-500 p-0.5 flex-shrink-0"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center gap-1 w-full px-1">
+                      <span className="text-xs font-semibold truncate text-center text-alabaster">
+                        {player.nickname}
+                      </span>
+                      {isMe && !player.isHost && (
+                        <button
+                          onClick={() => {
+                            setTempNickname(player.nickname);
+                            setEditingNickname(true);
+                          }}
+                          className="text-smoke hover:text-sienna transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0"
+                          title="Edit Nickname"
+                        >
+                          <Edit2 className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {player.isHost && <span className="badge text-[9px] !py-0 !px-1.5 font-bold mt-0.5">HOST</span>}
+                </motion.div>
+              );
+            })}
           </div>
 
           {/* Lobby Footer Actions */}

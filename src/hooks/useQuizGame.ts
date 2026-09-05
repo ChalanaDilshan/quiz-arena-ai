@@ -99,6 +99,8 @@ export interface UseQuizGameReturn {
   nextQuestion: () => void;
   resetGame: () => void;
   requestHint: () => void;
+  kickPlayer: (playerId: string) => void;
+  editNickname: (newNickname: string) => void;
 }
 
 // ─── Hook ───────────────────────────────────────────────────────────────────
@@ -205,6 +207,22 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
     [playerId, calculateScore],
   );
 
+  const resetGame = useCallback(() => {
+    clearTimer();
+    setGameState('HOME');
+    setSession(null);
+    setSelectedAnswer(null);
+    setIsAnswerRevealed(false);
+    setIsHost(false);
+    setUploadProgress(0);
+    setError(null);
+    setHint(null);
+    setHintUsed(false);
+    setHintLoading(false);
+    socketRef.current?.disconnect();
+    socketRef.current = null;
+  }, [clearTimer]);
+
   // ── WebSocket message handler (live mode) ──────────────────────────────
 
   const setupSocketListeners = useCallback((socket: Socket, pin: string) => {
@@ -240,9 +258,46 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
     });
 
     socket.on('error', (msg) => setError(msg));
-  }, []);
+    
+    socket.on('kicked', () => {
+      setError('You have been kicked by the host.');
+      resetGame();
+    });
+  }, [resetGame]);
 
   // ── Actions ────────────────────────────────────────────────────────────
+
+  const kickPlayer = useCallback((targetPlayerId: string) => {
+    if (!session || !isHost) return;
+    if (useMockMode) {
+      setSession(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          players: prev.players.filter(p => p.id !== targetPlayerId)
+        };
+      });
+    } else {
+      socketRef.current?.emit('kickPlayer', { pin: session.roomPin, targetPlayerId });
+    }
+  }, [session, isHost, useMockMode]);
+
+  const editNickname = useCallback((newNickname: string) => {
+    if (!session) return;
+    if (useMockMode) {
+      setSession(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          players: prev.players.map(p => 
+            p.id === playerId ? { ...p, nickname: newNickname } : p
+          )
+        };
+      });
+    } else {
+      socketRef.current?.emit('editNickname', { pin: session.roomPin, newNickname });
+    }
+  }, [session, useMockMode, playerId]);
 
   const joinGame = useCallback(
     (pin: string, nickname: string) => {
@@ -464,21 +519,6 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
     }
   }, [session, gameState, startTimer, useMockMode]);
 
-  const resetGame = useCallback(() => {
-    clearTimer();
-    setGameState('HOME');
-    setSession(null);
-    setSelectedAnswer(null);
-    setIsAnswerRevealed(false);
-    setIsHost(false);
-    setUploadProgress(0);
-    setError(null);
-    setHint(null);
-    setHintUsed(false);
-    setHintLoading(false);
-    socketRef.current?.disconnect();
-    socketRef.current = null;
-  }, [clearTimer]);
 
   // ── Hint Master ────────────────────────────────────────────────────────
 
@@ -573,5 +613,7 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
     nextQuestion,
     resetGame,
     requestHint,
+    kickPlayer,
+    editNickname,
   };
 }

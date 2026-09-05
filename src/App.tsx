@@ -119,7 +119,10 @@ function App() {
             roomPin={game.session?.roomPin ?? '------'}
             players={game.players}
             isHost={game.isHost}
+            currentUserId={game.playerId}
             onStartGame={game.startGame}
+            onKickPlayer={game.kickPlayer}
+            onEditNickname={game.editNickname}
           />
         );
       case 'QUESTION':
