@@ -95,3 +95,49 @@ export const playGameOverSound = () => {
     console.error('Audio failed:', e);
   }
 };
+
+/** 2-note ascending chime — for 2nd / 3rd place */
+export const playPodiumSound = () => {
+  try {
+    const ctx = getContext();
+    const playNote = (freq: number, delay: number, duration: number) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, ctx.currentTime + delay);
+      gain.gain.linearRampToValueAtTime(0.18, ctx.currentTime + delay + 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + duration);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(ctx.currentTime + delay);
+      osc.stop(ctx.currentTime + delay + duration);
+    };
+    // E5, G5
+    playNote(659.25, 0, 0.3);
+    playNote(783.99, 0.18, 0.5);
+  } catch (e) {
+    console.error('Audio failed:', e);
+  }
+};
+
+/** Single quiet ding — for 4th place and below */
+export const playFinisherSound = () => {
+  try {
+    const ctx = getContext();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(440, ctx.currentTime); // A4
+    gain.gain.setValueAtTime(0, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.12, ctx.currentTime + 0.04);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.35);
+  } catch (e) {
+    console.error('Audio failed:', e);
+  }
+};
+

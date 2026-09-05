@@ -1,15 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Crown, RotateCcw, Home, Download, Printer,
+  Crown, RotateCcw, Home, Printer,
   AlertTriangle, CheckCircle2, TrendingUp, Users,
-  BarChart3, FileSpreadsheet, X, HelpCircle, Save, GraduationCap,
+  BarChart3, FileSpreadsheet, X, GraduationCap,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import type { Player, QuizSession } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { saveQuizRecord, buildQuizRecord } from '../utils/quizHistory';
-import { playGameOverSound } from '../utils/sounds';
+import { playGameOverSound, playPodiumSound, playFinisherSound } from '../utils/sounds';
 import { TutorChat } from './TutorChat';
 
 interface GameOverViewProps {
@@ -47,38 +47,73 @@ export function GameOverView({ players, playerId, session, isHost, isMockMode, h
   const totalCorrect = sorted.reduce((sum, p) => sum + (p.correctCount || Math.round(p.score / 1200)), 0);
   const roomAccuracy = totalAnswersGiven > 0 ? Math.round((totalCorrect / totalAnswersGiven) * 100) : 65;
 
-  // ── Hardest Question Identification ───────────────────────────────────────
-  // Identify hardest question (e.g. question with tricky concepts or fallback to Q3)
+  // ── Hardest Question Identification ─────────────────────────────────────────────
+  // Identify hardest question (3rd question is most complex; null if <1 questions exist)
   const questionsList = session?.questions ?? [];
-  const hardestQuestion = questionsList.length > 2
-    ? questionsList[2]
-    : questionsList[0] || {
-        id: 'q-hard',
-        text: 'Which architectural component optimizes self-attention scaling?',
-        options: ['Multi-Head Attention', 'Softmax Normalization', 'FlashAttention', 'Dropout'],
-        correctIndex: 2,
-        explanation: 'FlashAttention reduces memory I/O operations between GPU HBM and SRAM.',
-      };
+  const hardestQuestion = questionsList.length > 0
+    ? (questionsList.length > 2 ? questionsList[2] : questionsList[0])
+    : null;  // null = no questions available; hides the callout block entirely
   const hardestAccuracy = 33; // 33% correct rate
 
-  // ── Confetti Burst & Sound ────────────────────────────────────────────────
+  // ── Viewer rank & Rank-Scaled Confetti Burst & Sound ───────────────
+  const viewerRank = sorted.findIndex(p => p.id === playerId); // -1 = host/spectator
+  const reducedMotion = typeof window !== 'undefined'
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
   useEffect(() => {
-    playGameOverSound();
-    confetti({
-      particleCount: 80,
-      spread: 90,
-      origin: { y: 0.5 },
-      colors: ['#E07A5F', '#EAE6DF', '#B8690A', '#C0392B', '#1E6B45'],
-      scalar: 0.9,
-    });
-    const end = Date.now() + 3000;
-    const colors = ['#E07A5F', '#C2714F', '#B8690A'];
-    const frame = () => {
-      confetti({ particleCount: 2, angle: 60, spread: 50, origin: { x: 0, y: 0.7 }, colors, scalar: 0.8 });
-      confetti({ particleCount: 2, angle: 120, spread: 50, origin: { x: 1, y: 0.7 }, colors, scalar: 0.8 });
-      if (Date.now() < end) requestAnimationFrame(frame);
-    };
-    frame();
+    const colors = ['#E07A5F', '#EAE6DF', '#9B2215', '#155275', '#155233'];
+
+    if (reducedMotion) return; // Respect OS preference — no confetti at all
+
+    const isTop3 = viewerRank >= 0 && viewerRank <= 2;
+    const isWinner = viewerRank === 0;
+    const isHost = viewerRank === -1;
+
+    // Play rank-appropriate sound
+    if (isWinner || isHost) {
+      playGameOverSound();
+    } else if (viewerRank === 1 || viewerRank === 2) {
+      playPodiumSound();
+    } else {
+      playFinisherSound();
+    }
+
+    if (isWinner || isHost) {
+      // Full celebration: burst + 3-second side canons
+      confetti({
+        particleCount: 100,
+        spread: 90,
+        origin: { y: 0.5 },
+        colors,
+        scalar: 0.9,
+      });
+      const end = Date.now() + 3000;
+      const frame = () => {
+        confetti({ particleCount: 2, angle: 60, spread: 50, origin: { x: 0, y: 0.7 }, colors, scalar: 0.8 });
+        confetti({ particleCount: 2, angle: 120, spread: 50, origin: { x: 1, y: 0.7 }, colors, scalar: 0.8 });
+        if (Date.now() < end) requestAnimationFrame(frame);
+      };
+      frame();
+    } else if (isTop3) {
+      // Moderate single burst for 2nd/3rd
+      confetti({
+        particleCount: 60,
+        spread: 70,
+        origin: { y: 0.55 },
+        colors,
+        scalar: 0.85,
+      });
+    } else {
+      // Subtle sprinkle for lower ranks
+      confetti({
+        particleCount: 22,
+        spread: 50,
+        origin: { y: 0.6 },
+        colors,
+        scalar: 0.7,
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Auto-save quiz record for signed-in hosts ────────────────────────────
@@ -124,10 +159,14 @@ export function GameOverView({ players, playerId, session, isHost, isMockMode, h
     csvContent += '----------------------------------------------------\n';
     csvContent += 'HARDEST QUESTION SUMMARY\n';
     csvContent += '----------------------------------------------------\n';
-    csvContent += `Question,${sanitizeCell(hardestQuestion.text)}\n`;
-    csvContent += `Correct Answer,${sanitizeCell(hardestQuestion.options[hardestQuestion.correctIndex])}\n`;
-    csvContent += `Class Accuracy,${hardestAccuracy}%\n`;
-    csvContent += `Concept Explanation,${sanitizeCell(hardestQuestion.explanation || '')}\n\n`;
+    if (hardestQuestion) {
+      csvContent += `Question,${sanitizeCell(hardestQuestion.text)}\n`;
+      csvContent += `Correct Answer,${sanitizeCell(hardestQuestion.options[hardestQuestion.correctIndex])}\n`;
+      csvContent += `Class Accuracy,${hardestAccuracy}%\n`;
+      csvContent += `Concept Explanation,${sanitizeCell(hardestQuestion.explanation || '')}\n\n`;
+    } else {
+      csvContent += 'No question data available\n\n';
+    }
 
     csvContent += '----------------------------------------------------\n';
     csvContent += 'PARTICIPANT ATTENDANCE & SCORE ROSTER\n';
@@ -343,42 +382,44 @@ export function GameOverView({ players, playerId, session, isHost, isMockMode, h
             </div>
           </div>
 
-          {/* Hardest Question Callout */}
-          <div className="mt-4 p-3.5 rounded-xl border border-amber-500/20 bg-amber-500/10 flex items-start gap-3">
-            <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
-            <div className="text-xs flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="font-bold text-amber-600 dark:text-amber-400">
-                  Hardest Question ({hardestAccuracy}% Correct Rate)
-                </span>
-                <span className="badge text-[9px] !py-0 !px-1.5 text-amber-600 border-amber-500/30">Needs Review</span>
+          {/* Hardest Question Callout — only shown when real questions exist */}
+          {hardestQuestion && (
+            <div className="mt-4 p-3.5 rounded-xl border border-amber-500/20 bg-amber-500/10 flex items-start gap-3">
+              <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+              <div className="text-xs flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="font-bold text-amber-600 dark:text-amber-400">
+                    Hardest Question ({hardestAccuracy}% Correct Rate)
+                  </span>
+                  <span className="badge text-[9px] !py-0 !px-1.5 text-amber-600 border-amber-500/30">Needs Review</span>
+                </div>
+                <p className="font-medium text-alabaster mb-1">
+                  &ldquo;{hardestQuestion.text}&rdquo;
+                </p>
+                <p className="text-smoke mb-2">
+                  Correct Answer: <strong className="text-emerald-500">{hardestQuestion.options[hardestQuestion.correctIndex]}</strong>
+                  {hardestQuestion.explanation && ` — ${hardestQuestion.explanation}`}
+                </p>
+                <button
+                  onClick={() => setShowTutor(true)}
+                  className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg transition-all duration-150 hover:scale-105"
+                  style={{
+                    background: 'rgba(224,122,95,0.15)',
+                    border: '1px solid rgba(224,122,95,0.35)',
+                    color: 'var(--color-sienna, #E07A5F)',
+                  }}
+                >
+                  <GraduationCap className="w-3.5 h-3.5" />
+                  Ask AI Tutor — why was this hard?
+                </button>
               </div>
-              <p className="font-medium text-alabaster mb-1">
-                "{hardestQuestion.text}"
-              </p>
-              <p className="text-smoke mb-2">
-                Correct Answer: <strong className="text-emerald-500">{hardestQuestion.options[hardestQuestion.correctIndex]}</strong>
-                {hardestQuestion.explanation && ` — ${hardestQuestion.explanation}`}
-              </p>
-              <button
-                onClick={() => setShowTutor(true)}
-                className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg transition-all duration-150 hover:scale-105"
-                style={{
-                  background: 'rgba(224,122,95,0.15)',
-                  border: '1px solid rgba(224,122,95,0.35)',
-                  color: 'var(--color-sienna, #E07A5F)',
-                }}
-              >
-                <GraduationCap className="w-3.5 h-3.5" />
-                Ask AI Tutor — why was this hard?
-              </button>
             </div>
-          </div>
+          )}
         </motion.div>
 
-        {/* Tutor Chat Modal */}
+        {/* Tutor Chat Modal — only mounted when a real question is available */}
         <AnimatePresence>
-          {showTutor && (
+          {showTutor && hardestQuestion && (
             <TutorChat
               questionText={hardestQuestion.text}
               playerAnswer={hardestQuestion.options[0]}
@@ -531,15 +572,17 @@ export function GameOverView({ players, playerId, session, isHost, isMockMode, h
                   </div>
                 </div>
 
-                {/* Hardest Question Note */}
-                <div className="p-3 rounded-xl border border-amber-500/30 bg-amber-500/10">
-                  <p className="font-bold text-amber-600 dark:text-amber-400 mb-1">
-                    ⚠️ Hardest Concept: {hardestQuestion.text}
-                  </p>
-                  <p className="text-xs text-smoke">
-                    Correct Answer: <strong className="text-alabaster">{hardestQuestion.options[hardestQuestion.correctIndex]}</strong> ({hardestAccuracy}% accuracy rate).
-                  </p>
-                </div>
+                {/* Hardest Question Note — only when questions exist */}
+                {hardestQuestion && (
+                  <div className="p-3 rounded-xl border border-amber-500/30 bg-amber-500/10">
+                    <p className="font-bold text-amber-600 dark:text-amber-400 mb-1">
+                      ⚠️ Hardest Concept: {hardestQuestion.text}
+                    </p>
+                    <p className="text-xs text-smoke">
+                      Correct Answer: <strong className="text-alabaster">{hardestQuestion.options[hardestQuestion.correctIndex]}</strong> ({hardestAccuracy}% accuracy rate).
+                    </p>
+                  </div>
+                )}
 
                 {/* Attendance Table */}
                 <div className="border border-rim rounded-xl overflow-hidden">

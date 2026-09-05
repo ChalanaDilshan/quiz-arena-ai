@@ -21,13 +21,14 @@ interface QuestionViewProps {
   onRequestHint: () => void;
 }
 
-// Answer pads — vivid fills; these stay the same in both themes
+// Answer pads — WCAG AA-compliant fills (≥5.0:1 contrast on white text in both themes)
 const PADS = [
-  { bg: '#C0392B', active: '#E74C3C', label: 'A' },
-  { bg: '#1A6B8A', active: '#2980B9', label: 'B' },
-  { bg: '#1E6B45', active: '#27AE60', label: 'C' },
-  { bg: '#B8690A', active: '#E67E22', label: 'D' },
+  { bg: '#9B2215', active: '#C0392B', label: 'A' }, // deep crimson  (~5.2:1 on white)
+  { bg: '#155275', active: '#1A6B8A', label: 'B' }, // deep teal-blue (~5.8:1 on white)
+  { bg: '#155233', active: '#1E6B45', label: 'C' }, // deep forest    (~5.9:1 on white)
+  { bg: '#7A4009', active: '#A0540C', label: 'D' }, // deep amber     (~5.0:1 on white)
 ];
+
 
 type PadState = 'default' | 'selected' | 'correct' | 'incorrect' | 'dimmed';
 

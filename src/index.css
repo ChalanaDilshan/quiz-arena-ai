@@ -196,3 +196,18 @@
     background: radial-gradient(circle, var(--color-sienna) 0%, rgba(224, 122, 95, 0.05) 70%, transparent 100%);
   }
 }
+
+/* ─── Accessibility: Reduced Motion ────────────────────────────────────── */
+/* Collapses CSS transitions/animations for users who prefer reduced motion.
+   Framer Motion respects this via the MotionConfig reducedMotion="user" prop
+   set in App.tsx; this rule covers any remaining CSS-only transitions.       */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

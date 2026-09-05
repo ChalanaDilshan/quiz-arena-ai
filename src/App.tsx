@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, MotionConfig } from 'framer-motion';
 import { Sun, Moon } from 'lucide-react';
 import { useTheme } from './context/ThemeContext';
 import { useQuizGame } from './hooks/useQuizGame';
@@ -175,29 +175,31 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-canvas">
-      <AnimatePresence mode="wait">
-        {showLanding ? (
-          <motion.div key="landing" variants={pageVariants} initial="initial" animate="animate" exit="exit" transition={{ duration: 0.3 }}>
-            <LandingPage
-              onHost={() => goToGame('host')}
-              onJoin={() => goToGame('join')}
-              onOpenAdmin={() => setShowAdmin(true)}
-            />
-          </motion.div>
-        ) : (
-          <motion.div key={game.gameState} variants={pageVariants} initial="initial" animate="animate" exit="exit" transition={{ duration: 0.25 }}>
-            <FloatingThemeToggle />
-            {renderGameView()}
-            <CommentatorWidget 
-              comment={commentator.currentComment} 
-              isVisible={commentator.isVisible} 
-              isTyping={commentator.isTyping} 
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+    <MotionConfig reducedMotion="user">
+      <div className="min-h-screen bg-canvas">
+        <AnimatePresence mode="wait">
+          {showLanding ? (
+            <motion.div key="landing" variants={pageVariants} initial="initial" animate="animate" exit="exit" transition={{ duration: 0.3 }}>
+              <LandingPage
+                onHost={() => goToGame('host')}
+                onJoin={() => goToGame('join')}
+                onOpenAdmin={() => setShowAdmin(true)}
+              />
+            </motion.div>
+          ) : (
+            <motion.div key={game.gameState} variants={pageVariants} initial="initial" animate="animate" exit="exit" transition={{ duration: 0.25 }}>
+              <FloatingThemeToggle />
+              {renderGameView()}
+              <CommentatorWidget 
+                comment={commentator.currentComment} 
+                isVisible={commentator.isVisible} 
+                isTyping={commentator.isTyping} 
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </MotionConfig>
   );
 }
 
