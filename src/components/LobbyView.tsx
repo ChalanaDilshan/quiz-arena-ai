@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Copy, Users, Play, Loader2, Check, QrCode, Link as LinkIcon, Sparkles, X, Edit2 } from 'lucide-react';
+import { Copy, Users, Play, Loader2, Check, QrCode, Link as LinkIcon, Sparkles, X, Edit2, Shield } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import type { Player } from '../types';
 
@@ -140,19 +140,33 @@ export function LobbyView({ roomPin, players, isHost, currentUserId, onStartGame
 
         {/* ── Players Roster Card ───────────────────────────────────── */}
         <div className="card rounded-2xl p-6">
-          <div className="flex items-center justify-between mb-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-5">
             <div className="flex items-center gap-2">
               <Users className="w-4 h-4 text-sienna" />
               <span className="text-sm font-bold text-alabaster">
                 Connected Participants
               </span>
+              {isHost && (
+                <span className="badge text-[10px] !py-0.5 !px-2 font-bold text-sienna border-sienna/30 bg-sienna-wash/30 flex items-center gap-1">
+                  <Shield className="w-3 h-3 text-sienna" />
+                  Host Moderation
+                </span>
+              )}
             </div>
-            <span className="badge">{players.length} / 50 joined</span>
+            <div className="flex items-center gap-2">
+              {isHost && players.some(p => !p.isHost && p.id !== currentUserId) && (
+                <span className="text-[10px] text-smoke hidden sm:inline">
+                  Tap <span className="text-red-400 font-bold">✕</span> to remove
+                </span>
+              )}
+              <span className="badge">{players.length} / 50 joined</span>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 min-h-[140px]">
             {players.map((player, i) => {
               const isMe = player.id === currentUserId;
+              const canKick = isHost && !player.isHost && player.id !== currentUserId;
               return (
                 <motion.div
                   key={player.id}
@@ -161,20 +175,27 @@ export function LobbyView({ roomPin, players, isHost, currentUserId, onStartGame
                   transition={{ delay: i * 0.05, type: 'spring', stiffness: 300, damping: 24 }}
                   className="relative flex flex-col items-center gap-2 py-4 px-2 rounded-xl border border-rim transition-all hover:border-sienna/40 bg-canvas group"
                 >
-                  {/* Kick Button for Host */}
-                  {isHost && !player.isHost && (
-                    <button
-                      onClick={() => onKickPlayer?.(player.id)}
-                      className="absolute top-1.5 right-1.5 p-1 rounded-full bg-red-500/10 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/20"
-                      title="Kick Player"
+                  {/* Prominent Visible Kick Button for Host */}
+                  {canKick && (
+                    <motion.button
+                      whileHover={{ scale: 1.15 }}
+                      whileTap={{ scale: 0.9 }}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onKickPlayer?.(player.id);
+                      }}
+                      className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow-md border-2 border-canvas transition-colors z-20 cursor-pointer"
+                      title={`Remove ${player.nickname} from lobby`}
+                      aria-label={`Remove ${player.nickname}`}
                     >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
+                      <X className="w-3.5 h-3.5 stroke-[2.5]" />
+                    </motion.button>
                   )}
 
                   <div
                     className="w-11 h-11 rounded-full flex items-center justify-center text-sm font-extrabold text-white shadow-sm"
-                    style={{ backgroundColor: player.avatarColor }}
+                    style={{ backgroundColor: player.avatarColor || '#6366f1' }}
                   >
                     {player.nickname[0]?.toUpperCase() || '?'}
                   </div>
@@ -218,7 +239,7 @@ export function LobbyView({ roomPin, players, isHost, currentUserId, onStartGame
                             setTempNickname(player.nickname);
                             setEditingNickname(true);
                           }}
-                          className="text-smoke hover:text-sienna transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0"
+                          className="text-smoke hover:text-sienna transition-colors opacity-70 hover:opacity-100 flex-shrink-0"
                           title="Edit Nickname"
                         >
                           <Edit2 className="w-3 h-3" />
@@ -228,6 +249,18 @@ export function LobbyView({ roomPin, players, isHost, currentUserId, onStartGame
                   )}
 
                   {player.isHost && <span className="badge text-[9px] !py-0 !px-1.5 font-bold mt-0.5">HOST</span>}
+                  {canKick && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onKickPlayer?.(player.id);
+                      }}
+                      className="text-[10px] font-semibold text-red-400/80 hover:text-red-400 transition-colors"
+                    >
+                      Remove
+                    </button>
+                  )}
                 </motion.div>
               );
             })}
