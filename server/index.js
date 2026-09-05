@@ -5,6 +5,7 @@ import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
+import crypto from 'crypto';
 import { adminAuth } from './firebaseAdmin.js';
 
 dotenv.config();
@@ -40,6 +41,32 @@ app.use(helmet());
 app.use(cors({ origin: ALLOWED_ORIGINS, methods: ['GET', 'POST'] }));
 // 3. Payload size limit
 app.use(express.json({ limit: '10kb' }));
+
+// ---------------------------------------------------------------------------
+// Room Registry & Socket Event Handlers
+// ---------------------------------------------------------------------------
+
+// pin -> { hostSocket, hostToken, hostId, players: [{id, nickname, score, streak, ...}], questions, currentQuestionIndex, state }
+const rooms = new Map();
+// pin -> { questions } (for tutor fallback after game ends)
+const recentRooms = new Map();
+
+// ---------------------------------------------------------------------------
+// Health check endpoint (for container orchestrators, load balancers, and monitoring)
+// Placed before rate limiter so health probes are never throttled
+// ---------------------------------------------------------------------------
+app.get(['/health', '/api/health'], (req, res) => {
+  res.status(200).json({
+    status: 'healthy',
+    uptime: Math.floor(process.uptime()),
+    timestamp: new Date().toISOString(),
+    activeRooms: rooms.size,
+    recentRooms: recentRooms.size,
+    service: 'quiz-arena-gateway',
+    version: '1.0.0'
+  });
+});
+
 // 4. Rate limiter
 app.set('trust proxy', 1);
 const apiLimiter = rateLimit({
@@ -49,15 +76,6 @@ const apiLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Too many requests, please try again later.' }
 });
-
-// ---------------------------------------------------------------------------
-// Room Registry & Socket Event Handlers
-// ---------------------------------------------------------------------------
-
-// pin -> { hostSocket, players: [{id, nickname, score, streak, ...}], questions, currentQuestionIndex, state }
-const rooms = new Map();
-// pin -> { questions } (for tutor fallback after game ends)
-const recentRooms = new Map();
 
 // Track hint usage: "pin:playerId:questionIndex" -> true (one hint per question)
 const hintUsage = new Set(); 
@@ -125,10 +143,21 @@ function broadcastState(pin) {
   io.to(pin).emit('gameStateUpdate', safeState);
 }
 
+function isHostAuthorized(room, socket, hostToken) {
+  if (!room) return false;
+  if (room.hostSocket === socket.id) return true;
+  if (hostToken && room.hostToken === hostToken) {
+    // Rebind hostSocket to current socket if token matches
+    room.hostSocket = socket.id;
+    return true;
+  }
+  return false;
+}
+
 io.on('connection', (socket) => {
   console.log('Socket connected:', socket.id);
 
-  socket.on('hostGame', ({ quizData, pin }) => {
+  socket.on('hostGame', ({ quizData, pin, hostId }) => {
     if (!quizData || !Array.isArray(quizData.questions) || quizData.questions.length === 0 || quizData.questions.length > 100) {
       socket.emit('error', 'Invalid quizData: questions array is required (max 100).');
       return;
@@ -153,10 +182,15 @@ io.on('connection', (socket) => {
       if (existingRoom.timerInterval) clearInterval(existingRoom.timerInterval);
     }
 
+    const hostToken = crypto.randomUUID();
+    const actualHostId = hostId || socket.id;
+
     rooms.set(pin, {
       hostSocket: socket.id,
+      hostToken,
+      hostId: actualHostId,
       players: [{
-        id: socket.id,
+        id: actualHostId,
         socketId: socket.id,
         nickname: 'Host',
         isHost: true,
@@ -174,9 +208,70 @@ io.on('connection', (socket) => {
       timerInterval: null,
       cleanupTimeout: null
     });
-    socket.playerId = socket.id;
+    socket.playerId = actualHostId;
     socket.roomPin = pin;
     socket.join(pin);
+
+    // Provide persistent host credentials to the client so page refresh does not lock them out
+    socket.emit('hostCreated', { pin, hostToken, hostId: actualHostId });
+    broadcastState(pin);
+  });
+
+  socket.on('reconnectHost', ({ pin, hostToken, hostId }) => {
+    const room = rooms.get(pin);
+    if (!room) {
+      socket.emit('error', 'Room not found or game has already ended.');
+      return;
+    }
+
+    if (!hostToken || room.hostToken !== hostToken) {
+      socket.emit('error', 'Unauthorized: Invalid host token for room.');
+      return;
+    }
+
+    // Cancel pending cleanup timeout since the host returned
+    if (room.cleanupTimeout) {
+      clearTimeout(room.cleanupTimeout);
+      room.cleanupTimeout = null;
+      console.log(`[Host Reconnect] Host reconnected to room ${pin}. Cleared cleanup timer.`);
+    }
+
+    // Rebind host socket ID
+    room.hostSocket = socket.id;
+
+    // Rebind host player in room players list
+    const hostPlayer = room.players.find(p => p.isHost || p.id === (hostId || room.hostId));
+    if (hostPlayer) {
+      hostPlayer.socketId = socket.id;
+      socket.playerId = hostPlayer.id;
+    } else {
+      socket.playerId = hostId || room.hostId || socket.id;
+    }
+
+    socket.roomPin = pin;
+    socket.join(pin);
+
+    console.log(`[Host Reconnect] Room ${pin} host rebound to new socket ${socket.id}`);
+
+    // Send complete host snapshot back to host
+    socket.emit('hostReconnected', {
+      pin,
+      state: room.state,
+      currentQuestionIndex: room.currentQuestionIndex,
+      timeRemaining: room.timeRemaining,
+      questions: room.questions,
+      topic: room.topic,
+      players: room.players.map(p => ({
+        id: p.id,
+        nickname: p.nickname,
+        score: p.score,
+        streak: p.streak,
+        wrongStreak: p.wrongStreak,
+        isHost: p.isHost
+      }))
+    });
+
+    // Notify all players of updated room state
     broadcastState(pin);
   });
 
@@ -235,9 +330,9 @@ io.on('connection', (socket) => {
     broadcastState(pin);
   });
 
-  socket.on('startGame', ({ pin }) => {
+  socket.on('startGame', ({ pin, hostToken }) => {
     const room = rooms.get(pin);
-    if (room && room.hostSocket === socket.id) {
+    if (isHostAuthorized(room, socket, hostToken)) {
       room.state = 'QUESTION';
       room.timeRemaining = room.questions[0]?.timeLimit || 20;
       room.players.forEach(p => {
@@ -300,9 +395,9 @@ io.on('connection', (socket) => {
     broadcastState(pin);
   });
 
-  socket.on('nextQuestion', ({ pin }) => {
+  socket.on('nextQuestion', ({ pin, hostToken }) => {
     const room = rooms.get(pin);
-    if (room && room.hostSocket === socket.id) {
+    if (isHostAuthorized(room, socket, hostToken)) {
       if (room.currentQuestionIndex < room.questions.length - 1) {
         room.currentQuestionIndex += 1;
         room.state = 'QUESTION';
@@ -326,9 +421,9 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('kickPlayer', ({ pin, targetPlayerId }) => {
+  socket.on('kickPlayer', ({ pin, targetPlayerId, hostToken }) => {
     const room = rooms.get(pin);
-    if (room && room.hostSocket === socket.id) {
+    if (isHostAuthorized(room, socket, hostToken)) {
       const targetIndex = room.players.findIndex(p => p.id === targetPlayerId);
       if (targetIndex !== -1) {
         const targetPlayer = room.players[targetIndex];
@@ -361,9 +456,11 @@ io.on('connection', (socket) => {
     // Cleanup zombie rooms to prevent memory leaks if host disconnects
     for (const [pin, room] of rooms.entries()) {
       if (room.hostSocket === socket.id) {
+        console.log(`[Host Disconnect] Host socket ${socket.id} disconnected from room ${pin}. Starting 5m grace period.`);
         room.cleanupTimeout = setTimeout(() => {
           const r = rooms.get(pin);
-          if (r && r.hostSocket === socket.id) { // Ensure it's still the same room instance
+          // Only destroy if the host has not reconnected on a new socket ID
+          if (r && r.hostSocket === socket.id) {
             if (r.timerInterval) clearInterval(r.timerInterval);
             rooms.delete(pin);
             console.log(`[Cleanup] Room ${pin} destroyed due to host inactivity.`);

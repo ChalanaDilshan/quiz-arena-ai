@@ -69,6 +69,18 @@ function generateId(): string {
   return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 }
 
+// ─── Host Session Persistence ───────────────────────────────────────────────
+
+const HOST_SESSION_KEY = 'quizarena_host_session';
+
+interface StoredHostSession {
+  pin: string;
+  hostToken: string;
+  hostId: string;
+  isMock?: boolean;
+  mockSession?: QuizSession;
+}
+
 // ─── Return type ────────────────────────────────────────────────────────────
 
 export interface UseQuizGameReturn {
@@ -123,6 +135,22 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const socketRef = useRef<Socket | null>(null);
+  const hostTokenRef = useRef<string | null>(null);
+
+  const saveHostSession = useCallback((data: StoredHostSession) => {
+    try {
+      sessionStorage.setItem(HOST_SESSION_KEY, JSON.stringify(data));
+    } catch {
+      // Ignore quota / private browsing errors
+    }
+  }, []);
+
+  const clearHostSession = useCallback(() => {
+    try {
+      sessionStorage.removeItem(HOST_SESSION_KEY);
+    } catch {}
+    hostTokenRef.current = null;
+  }, []);
 
   // Derived state
   const currentQuestion = session
@@ -209,6 +237,7 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
 
   const resetGame = useCallback(() => {
     clearTimer();
+    clearHostSession();
     setGameState('HOME');
     setSession(null);
     setSelectedAnswer(null);
@@ -221,7 +250,7 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
     setHintLoading(false);
     socketRef.current?.disconnect();
     socketRef.current = null;
-  }, [clearTimer]);
+  }, [clearTimer, clearHostSession]);
 
   // ── WebSocket message handler (live mode) ──────────────────────────────
 
@@ -257,13 +286,38 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
       }
     });
 
+    socket.on('hostCreated', ({ pin: createdPin, hostToken, hostId: createdHostId }) => {
+      hostTokenRef.current = hostToken;
+      saveHostSession({ pin: createdPin, hostToken, hostId: createdHostId });
+      setIsHost(true);
+    });
+
+    socket.on('hostReconnected', (data) => {
+      setIsHost(true);
+      setGameState(data.state);
+      setTimeRemaining(data.timeRemaining);
+      setSession({
+        roomPin: data.pin,
+        hostId: playerId,
+        currentQuestionIndex: data.currentQuestionIndex,
+        players: data.players,
+        questions: data.questions || [],
+        gameState: data.state
+      });
+      if (data.state === 'QUESTION') {
+        setIsAnswerRevealed(false);
+      } else if (data.state === 'LEADERBOARD' || data.state === 'GAME_OVER') {
+        setIsAnswerRevealed(true);
+      }
+    });
+
     socket.on('error', (msg) => setError(msg));
     
     socket.on('kicked', () => {
       setError('You have been kicked by the host.');
       resetGame();
     });
-  }, [resetGame]);
+  }, [resetGame, saveHostSession, playerId]);
 
   // ── Actions ────────────────────────────────────────────────────────────
 
@@ -278,7 +332,11 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
         };
       });
     } else {
-      socketRef.current?.emit('kickPlayer', { pin: session.roomPin, targetPlayerId });
+      socketRef.current?.emit('kickPlayer', {
+        pin: session.roomPin,
+        targetPlayerId,
+        hostToken: hostTokenRef.current
+      });
     }
   }, [session, isHost, useMockMode]);
 
@@ -375,14 +433,22 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
               avatarColor: AVATAR_COLORS[0],
               isHost: true,
             };
-            setSession({
+            const newSession: QuizSession = {
               roomPin: pin,
               questions,
               players: [host, ...buildMockPlayers()],
               currentQuestionIndex: 0,
               gameState: 'LOBBY',
               hostId: playerId,
+            };
+            saveHostSession({
+              pin,
+              hostToken: 'mock-token',
+              hostId: playerId,
+              isMock: true,
+              mockSession: newSession,
             });
+            setSession(newSession);
             setIsHost(true);
             setGameState('LOBBY');
           }
@@ -394,7 +460,7 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
       // Live mode: POST file + config to backend
       console.info(`[Live] Requesting ${numQuestions} ${difficulty} questions`);
     },
-    [useMockMode, playerId, buildMockPlayers],
+    [useMockMode, playerId, buildMockPlayers, saveHostSession],
   );
 
   const hostSavedQuiz = useCallback(
@@ -411,14 +477,22 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
           avatarColor: AVATAR_COLORS[0],
           isHost: true,
         };
-        setSession({
+        const newSession: QuizSession = {
           roomPin: pin,
           questions: quiz.questions,
           players: [host, ...buildMockPlayers()],
           currentQuestionIndex: 0,
           gameState: 'LOBBY',
           hostId: playerId,
+        };
+        saveHostSession({
+          pin,
+          hostToken: 'mock-token',
+          hostId: playerId,
+          isMock: true,
+          mockSession: newSession,
         });
+        setSession(newSession);
         setIsHost(true);
         setGameState('LOBBY');
         return;
@@ -430,17 +504,18 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
         const socket = io(url);
         socketRef.current = socket;
         
+        setupSocketListeners(socket, pin);
+
         socket.on('connect', () => {
-          socket.emit('hostGame', { pin, quizData: quiz });
+          socket.emit('hostGame', { pin, quizData: quiz, hostId: playerId });
         });
         
-        setupSocketListeners(socket, pin);
         setIsHost(true);
       } catch {
         setError('Could not connect to game server.');
       }
     },
-    [playerId, buildMockPlayers, useMockMode, setupSocketListeners],
+    [playerId, buildMockPlayers, useMockMode, setupSocketListeners, saveHostSession],
   );
 
   const startGame = useCallback(() => {
@@ -453,7 +528,10 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
       setGameState('QUESTION');
       startTimer(session.questions[0]?.timeLimit ?? 20);
     } else {
-      socketRef.current?.emit('startGame', { pin: session.roomPin });
+      socketRef.current?.emit('startGame', {
+        pin: session.roomPin,
+        hostToken: hostTokenRef.current
+      });
     }
   }, [session, startTimer, useMockMode]);
 
@@ -514,7 +592,10 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
         startTimer(session.questions[nextIdx]?.timeLimit ?? 20);
       }
     } else {
-      socketRef.current?.emit('nextQuestion', { pin: session.roomPin });
+      socketRef.current?.emit('nextQuestion', {
+        pin: session.roomPin,
+        hostToken: hostTokenRef.current
+      });
       setSelectedAnswer(null); // Reset selection
     }
   }, [session, gameState, startTimer, useMockMode]);
@@ -578,6 +659,48 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
     setHintUsed(false);
     setHintLoading(false);
   }, [session?.currentQuestionIndex]);
+
+  // ── Auto Reconnect Host on Refresh ─────────────────────────────────────────
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(HOST_SESSION_KEY);
+      if (!raw) return;
+      const stored: StoredHostSession = JSON.parse(raw);
+      if (!stored?.pin) return;
+
+      if (stored.isMock && stored.mockSession) {
+        setSession(stored.mockSession);
+        setGameState(stored.mockSession.gameState);
+        setIsHost(true);
+        return;
+      }
+
+      if (stored.hostToken) {
+        hostTokenRef.current = stored.hostToken;
+        const url = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+        const socket = io(url);
+        socketRef.current = socket;
+
+        setupSocketListeners(socket, stored.pin);
+
+        socket.on('connect', () => {
+          socket.emit('reconnectHost', {
+            pin: stored.pin,
+            hostToken: stored.hostToken,
+            hostId: stored.hostId || playerId
+          });
+        });
+
+        socket.on('error', (err) => {
+          if (typeof err === 'string' && (err.includes('not found') || err.includes('expired') || err.includes('Unauthorized'))) {
+            clearHostSession();
+          }
+        });
+      }
+    } catch (e) {
+      console.warn('Failed to restore host session from sessionStorage:', e);
+    }
+  }, [playerId, setupSocketListeners, clearHostSession]);
 
   // Cleanup on unmount
   useEffect(() => {

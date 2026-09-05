@@ -51,8 +51,13 @@ function App() {
     }
   });
 
-  // Controls whether we show the marketing landing page (skip if scanning QR with ?pin=...)
-  const [showLanding, setShowLanding] = useState<boolean>(() => !initialPin);
+  // Controls whether we show the marketing landing page (skip if scanning QR with ?pin=... or restoring host session)
+  const [showLanding, setShowLanding] = useState<boolean>(() => {
+    try {
+      if (sessionStorage.getItem('quizarena_host_session')) return false;
+    } catch {}
+    return !initialPin;
+  });
   // Controls whether admin dashboard is shown
   const [showAdmin, setShowAdmin] = useState(false);
   // Tab to pre-select on HomeView ('join' or 'host')
@@ -60,8 +65,26 @@ function App() {
   // Track the PDF filename used for the current hosted quiz (for history)
   const [hostFileName, setHostFileName] = useState('');
 
-  const game = useQuizGame(true); // true = mock mode; set false + VITE_WS_URL for live
+  const isMockMode = (() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('live') === 'true') return false;
+      if (params.get('mock') === 'true') return true;
+      if (import.meta.env.VITE_USE_MOCK === 'false') return false;
+      if (import.meta.env.VITE_USE_MOCK === 'true') return true;
+    } catch {}
+    return true; // Default fallback to mock mode for offline demo
+  })();
+
+  const game = useQuizGame(isMockMode);
   const commentator = useCommentator();
+
+  // If host session is restored or active, ensure landing page is hidden
+  useEffect(() => {
+    if (game.isHost && game.gameState !== 'HOME') {
+      setShowLanding(false);
+    }
+  }, [game.isHost, game.gameState]);
 
   // ── AI Commentator Triggers (Less Distracting) ────────────────────────────
   useEffect(() => {
