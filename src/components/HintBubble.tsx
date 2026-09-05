@@ -31,6 +31,8 @@ export function HintBubble({ hintUsed, hintLoading, hint, disabled, onRequestHin
               whileTap={canClick ? { scale: 0.96 } : {}}
               onClick={canClick ? onRequestHint : undefined}
               disabled={!canClick}
+              aria-label="Request a hint from Hint Master (or press H on keyboard)"
+              aria-expanded={hintUsed}
               className={`
                 flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold
                 border transition-all duration-200 select-none
@@ -41,7 +43,8 @@ export function HintBubble({ hintUsed, hintLoading, hint, disabled, onRequestHin
               `}
             >
               <Lightbulb className="w-4 h-4" />
-              Need a Hint?
+              <span>Need a Hint?</span>
+              <span className="hidden sm:inline-block text-[10px] opacity-60 font-mono">[H]</span>
             </motion.button>
           </motion.div>
         )}
@@ -50,6 +53,9 @@ export function HintBubble({ hintUsed, hintLoading, hint, disabled, onRequestHin
         {hintUsed && hintLoading && (
           <motion.div
             key="hint-loading"
+            role="status"
+            aria-live="polite"
+            aria-label="Hint Master is thinking"
             initial={{ opacity: 0, scale: 0.97 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0 }}
@@ -76,6 +82,9 @@ export function HintBubble({ hintUsed, hintLoading, hint, disabled, onRequestHin
         {hintUsed && !hintLoading && hint && (
           <motion.div
             key="hint-revealed"
+            role="region"
+            aria-live="polite"
+            aria-label="AI Hint from Hint Master"
             initial={{ opacity: 0, scale: 0.97, y: 8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0 }}

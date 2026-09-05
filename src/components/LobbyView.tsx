@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Copy, Users, Play, Loader2, Check, QrCode, Link as LinkIcon, Sparkles, X, Edit2, Shield } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
@@ -20,6 +20,15 @@ export function LobbyView({ roomPin, players, isHost, currentUserId, onStartGame
   const [showQrModal, setShowQrModal] = useState(false);
   const [editingNickname, setEditingNickname] = useState(false);
   const [tempNickname, setTempNickname] = useState('');
+
+  // Close QR modal on Escape
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowQrModal(false);
+    };
+    if (showQrModal) window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [showQrModal]);
 
   const joinUrl = typeof window !== 'undefined'
     ? `${window.location.origin}/?pin=${roomPin}`
@@ -86,6 +95,7 @@ export function LobbyView({ roomPin, players, isHost, currentUserId, onStartGame
                   onClick={copyPin}
                   className="rounded-xl p-2.5 sm:p-3 border border-rim transition-colors hover:border-sienna bg-canvas ml-1"
                   title="Copy 6-Digit PIN"
+                  aria-label="Copy 6-Digit PIN"
                 >
                   {copiedPin ? (
                     <Check className="w-4 h-4 text-emerald-500" />
@@ -117,6 +127,7 @@ export function LobbyView({ roomPin, players, isHost, currentUserId, onStartGame
               <button
                 onClick={() => setShowQrModal(true)}
                 className="btn-ghost text-xs !py-1.5 !px-3 font-semibold flex items-center gap-1.5"
+                aria-label="Enlarge QR Code for Projector"
               >
                 <QrCode className="w-3.5 h-3.5 text-sienna" />
                 <span>Enlarge QR</span>
@@ -126,6 +137,7 @@ export function LobbyView({ roomPin, players, isHost, currentUserId, onStartGame
                 onClick={copyJoinLink}
                 className="btn-ghost text-xs !py-1.5 !px-2.5"
                 title="Copy Direct Join URL"
+                aria-label="Copy Direct Join URL"
               >
                 {copiedLink ? (
                   <Check className="w-3.5 h-3.5 text-emerald-500" />
@@ -163,13 +175,19 @@ export function LobbyView({ roomPin, players, isHost, currentUserId, onStartGame
             </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 min-h-[140px]">
+          <div
+            role="list"
+            aria-label="Connected participants roster"
+            className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 min-h-[140px]"
+          >
             {players.map((player, i) => {
               const isMe = player.id === currentUserId;
               const canKick = isHost && !player.isHost && player.id !== currentUserId;
               return (
                 <motion.div
                   key={player.id}
+                  role="listitem"
+                  aria-label={`${player.nickname}${player.isHost ? ' (Host)' : ''}${isMe ? ' (You)' : ''}`}
                   initial={{ scale: 0.7, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   transition={{ delay: i * 0.05, type: 'spring', stiffness: 300, damping: 24 }}
@@ -279,6 +297,7 @@ export function LobbyView({ roomPin, players, isHost, currentUserId, onStartGame
                 whileTap={{ scale: 0.97 }}
                 onClick={onStartGame}
                 disabled={players.length < 2}
+                aria-label={`Start match with ${players.length} players`}
                 className="btn-primary !px-8 !py-3 w-full sm:w-auto flex items-center justify-center gap-2 shadow-lg shadow-sienna/25"
               >
                 <Play className="w-4 h-4 fill-current" />
@@ -299,13 +318,16 @@ export function LobbyView({ roomPin, players, isHost, currentUserId, onStartGame
         {showQrModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
             <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="qr-modal-title"
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
               className="card rounded-3xl p-8 max-w-sm w-full text-center relative border border-rim shadow-2xl"
               style={{ background: 'var(--color-elevated)' }}
             >
-              <h3 className="text-xl font-extrabold text-alabaster mb-1">
+              <h3 id="qr-modal-title" className="text-xl font-extrabold text-alabaster mb-1">
                 Scan to Join Room
               </h3>
               <p className="text-xs text-smoke mb-6">
@@ -341,6 +363,7 @@ export function LobbyView({ roomPin, players, isHost, currentUserId, onStartGame
                 </button>
                 <button
                   onClick={() => setShowQrModal(false)}
+                  aria-label="Close QR modal"
                   className="btn-ghost text-xs !py-2.5 px-4"
                 >
                   Close

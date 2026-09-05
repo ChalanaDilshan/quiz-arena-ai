@@ -116,6 +116,7 @@ function QuizDetailView({
       <div className="flex items-center justify-between mb-6">
         <button
           onClick={onBack}
+          aria-label="Back to all quizzes"
           className="flex items-center gap-2 text-sm font-medium text-smoke hover:text-alabaster transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -124,6 +125,7 @@ function QuizDetailView({
         <div className="flex items-center gap-2">
           <button
             onClick={exportCsv}
+            aria-label="Export quiz results as CSV spreadsheet"
             className="btn-primary text-xs !py-2 !px-3.5 flex items-center gap-1.5"
           >
             <FileSpreadsheet className="w-3.5 h-3.5" />
@@ -131,6 +133,7 @@ function QuizDetailView({
           </button>
           <button
             onClick={onDelete}
+            aria-label="Delete this quiz record"
             className="btn-ghost text-xs !py-2 !px-3 flex items-center gap-1.5 text-red-400 hover:text-red-300"
           >
             <Trash2 className="w-3.5 h-3.5" />
@@ -473,6 +476,7 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
           <div className="flex items-center gap-3">
             <button
               onClick={onBack}
+              aria-label="Back to application"
               className="btn-ghost !p-2 rounded-lg"
               title="Back to app"
             >
@@ -509,6 +513,8 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
             <button
               onClick={simulateBackgroundAgent}
               disabled={isTriggering}
+              aria-label="Trigger autonomous syllabus agent"
+              aria-busy={isTriggering}
               className="btn-primary !py-1.5 !px-3 text-xs flex items-center gap-1.5 hidden sm:flex"
             >
               <Zap className="w-3.5 h-3.5" />
@@ -517,6 +523,7 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
 
             <button
               onClick={signOut}
+              aria-label="Sign out of host account"
               className="btn-ghost !py-1.5 !px-3 text-xs flex items-center gap-1.5 text-smoke hover:text-red-400 transition-colors"
             >
               <LogOut className="w-3.5 h-3.5" />
@@ -558,6 +565,8 @@ export function AdminDashboard({ onBack }: AdminDashboardProps) {
               <AnimatePresence>
                 {pendingQuiz && (
                   <motion.div
+                    role="alert"
+                    aria-live="polite"
                     initial={{ opacity: 0, y: -20, height: 0 }}
                     animate={{ opacity: 1, y: 0, height: 'auto' }}
                     exit={{ opacity: 0, y: -20, height: 0 }}

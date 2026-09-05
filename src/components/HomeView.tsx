@@ -129,10 +129,14 @@ export function HomeView({ onJoinGame, onHostGame, onHostSavedQuiz, uploadProgre
         {/* Card */}
         <div className="card overflow-hidden">
           {/* Tabs */}
-          <div className="flex border-b border-rim">
+          <div role="tablist" aria-label="Game Mode Selection" className="flex border-b border-rim">
             {(['join', 'host'] as const).map(tab => (
               <button
                 key={tab}
+                role="tab"
+                id={`tab-${tab}`}
+                aria-selected={activeTab === tab}
+                aria-controls={`panel-${tab}`}
                 onClick={() => { setActiveTab(tab); setHostStep('upload'); }}
                 className="flex-1 flex items-center justify-center gap-1.5 py-3 text-sm font-semibold transition-all duration-150"
                 style={{
@@ -165,14 +169,24 @@ export function HomeView({ onJoinGame, onHostGame, onHostSavedQuiz, uploadProgre
 
             <AnimatePresence mode="wait">
               {activeTab === 'join' ? (
-                <motion.div key="join" initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 8 }} transition={{ duration: 0.16 }}>
+                <motion.div
+                  key="join"
+                  role="tabpanel"
+                  id="panel-join"
+                  aria-labelledby="tab-join"
+                  initial={{ opacity: 0, x: -8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 8 }}
+                  transition={{ duration: 0.16 }}
+                >
                   <p className="text-[10px] uppercase tracking-widest font-semibold text-smoke mb-2">Game PIN</p>
-                  <div className="flex gap-1.5 mb-5" onPaste={handlePinPaste}>
+                  <div className="flex gap-1.5 mb-5" onPaste={handlePinPaste} role="group" aria-label="Game PIN input">
                     {pin.map((digit, i) => (
                       <input
                         key={i}
                         ref={el => { pinRefs.current[i] = el; }}
                         type="text" inputMode="numeric" maxLength={1} value={digit}
+                        aria-label={`Digit ${i + 1} of 6 of PIN`}
                         onChange={e => handlePinChange(i, e.target.value)}
                         onKeyDown={e => handlePinKeyDown(i, e)}
                         className="w-full text-center text-xl font-bold rounded-lg transition-all duration-150"
@@ -186,11 +200,22 @@ export function HomeView({ onJoinGame, onHostGame, onHostSavedQuiz, uploadProgre
                     ))}
                   </div>
                   <p className="text-[10px] uppercase tracking-widest font-semibold text-smoke mb-2">Nickname</p>
-                  <input type="text" value={nickname} onChange={e => setNickname(e.target.value)}
+                  <input
+                    type="text"
+                    value={nickname}
+                    onChange={e => setNickname(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && canJoin && onJoinGame(fullPin, nickname.trim())}
-                    placeholder="How should we call you?" maxLength={16} className="input-field mb-5" />
-                  <button onClick={() => canJoin && onJoinGame(fullPin, nickname.trim())} disabled={!canJoin}
-                    className="btn-primary w-full">
+                    placeholder="How should we call you?"
+                    aria-label="Enter your player nickname"
+                    maxLength={16}
+                    className="input-field mb-5"
+                  />
+                  <button
+                    onClick={() => canJoin && onJoinGame(fullPin, nickname.trim())}
+                    disabled={!canJoin}
+                    aria-label="Join game with PIN and Nickname"
+                    className="btn-primary w-full"
+                  >
                     Join Game <ArrowRight className="w-4 h-4" />
                   </button>
                 </motion.div>
@@ -247,7 +272,14 @@ export function HomeView({ onJoinGame, onHostGame, onHostSavedQuiz, uploadProgre
                       background: isDragging ? 'var(--color-sienna-wash)' : selectedFile ? 'color-mix(in srgb, var(--color-sienna) 4%, transparent)' : 'var(--color-canvas)',
                     }}
                   >
-                    <input ref={fileInputRef} type="file" accept=".pdf" onChange={handleFileSelect} className="hidden" />
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".pdf"
+                      aria-label="Upload PDF file"
+                      onChange={handleFileSelect}
+                      className="hidden"
+                    />
                     {selectedFile ? (
                       <>
                         <FileText className="w-9 h-9 mx-auto mb-3 text-sienna" />
@@ -345,16 +377,23 @@ export function HomeView({ onJoinGame, onHostGame, onHostSavedQuiz, uploadProgre
                   {/* Difficulty */}
                   <div className="mb-6">
                     <p className="text-sm font-semibold text-alabaster mb-2.5">Difficulty</p>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div role="radiogroup" aria-label="Quiz difficulty level" className="grid grid-cols-3 gap-2">
                       {(Object.keys(DIFFICULTY_META) as Difficulty[]).map(d => {
                         const active = difficulty === d;
                         return (
-                          <motion.button key={d} whileTap={{ scale: 0.95 }} onClick={() => setDifficulty(d)}
+                          <motion.button
+                            key={d}
+                            role="radio"
+                            aria-checked={active}
+                            aria-label={`${d} difficulty: ${DIFFICULTY_META[d].desc}`}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => setDifficulty(d)}
                             className="py-3 px-1.5 rounded-lg text-center transition-all duration-150"
                             style={{
                               background: active ? 'var(--color-sienna-wash)' : 'var(--color-canvas)',
                               border: active ? '1.5px solid var(--color-sienna)' : '1px solid var(--color-rim)',
-                            }}>
+                            }}
+                          >
                             <p className="text-xs font-bold" style={{ color: active ? 'var(--color-sienna)' : 'var(--color-smoke)' }}>{d}</p>
                             <p className="text-[10px] mt-0.5 leading-tight" style={{ color: active ? 'var(--color-sienna)' : 'var(--color-rim)' }}>
                               {DIFFICULTY_META[d].desc}

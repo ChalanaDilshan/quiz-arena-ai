@@ -22,8 +22,14 @@ export function CommentatorWidget({ comment, isVisible, isTyping }: CommentatorW
             {/* Connection line to avatar */}
             <div className="absolute -left-3 top-1/2 w-3 h-0.5 bg-indigo-500/30" />
             
-            <div className="card rounded-2xl p-4 border border-indigo-500/20 shadow-2xl shadow-indigo-500/10"
-                 style={{ background: 'color-mix(in srgb, var(--color-canvas) 85%, transparent)', backdropFilter: 'blur(12px)' }}>
+            <div
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+              aria-label="AI Host Commentary"
+              className="card rounded-2xl p-4 border border-indigo-500/20 shadow-2xl shadow-indigo-500/10"
+              style={{ background: 'color-mix(in srgb, var(--color-canvas) 85%, transparent)', backdropFilter: 'blur(12px)' }}
+            >
               
               <div className="flex items-start gap-3">
                 <div className="relative flex-shrink-0 mt-1">

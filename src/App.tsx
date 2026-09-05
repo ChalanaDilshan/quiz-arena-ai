@@ -31,6 +31,7 @@ function FloatingThemeToggle() {
       onClick={toggleTheme}
       className="fixed top-4 right-4 z-50 w-9 h-9 rounded-lg flex items-center justify-center card transition-colors"
       title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+      aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
     >
       <motion.div key={theme} initial={{ rotate: -20, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} transition={{ duration: 0.2 }}>
         {theme === 'dark' ? <Sun className="w-4 h-4 text-smoke" /> : <Moon className="w-4 h-4 text-smoke" />}

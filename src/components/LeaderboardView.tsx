@@ -36,12 +36,14 @@ export function LeaderboardView({
         </div>
 
         {/* Rankings */}
-        <div className="card rounded-2xl mb-5 overflow-hidden">
+        <div role="list" aria-label="Player rankings" className="card rounded-2xl mb-5 overflow-hidden">
           {sorted.map((player, rank) => {
             const isMe = player.id === playerId;
             return (
               <motion.div
                 key={player.id} layout
+                role="listitem"
+                aria-label={`Rank ${rank + 1}: ${player.nickname}${isMe ? ' (You)' : ''}, ${player.score.toLocaleString()} points`}
                 initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }}
                 transition={{ layout: { type: 'spring', stiffness: 350, damping: 34 }, delay: rank * 0.05 }}
                 className="relative flex items-center gap-3 px-4 py-3.5 transition-colors"
@@ -99,7 +101,9 @@ export function LeaderboardView({
 
         <div className="text-center">
           <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-            onClick={onNextQuestion} className="btn-primary !px-8">
+            onClick={onNextQuestion}
+            aria-label={isLast ? 'See Final Results' : 'Proceed to Next Question'}
+            className="btn-primary !px-8">
             {isLast ? 'See Final Results' : 'Next Question'}
             <ChevronRight className="w-4 h-4" />
           </motion.button>

@@ -30,6 +30,15 @@ export function TutorChat({ questionText, playerAnswer, correctAnswer, roomPin, 
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
 
+  // Close modal on Escape key
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [onClose]);
+
   // Fetch initial explanation on mount
   useEffect(() => {
     fetchExplanation(null);
@@ -113,6 +122,9 @@ export function TutorChat({ questionText, playerAnswer, correctAnswer, roomPin, 
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <motion.div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="tutor-dialog-title"
         className="w-full max-w-lg rounded-2xl flex flex-col overflow-hidden"
         style={{
           background: 'var(--color-card, #1a1a1a)',
@@ -133,11 +145,12 @@ export function TutorChat({ questionText, playerAnswer, correctAnswer, roomPin, 
             <Bot className="w-4 h-4" style={{ color: 'var(--color-sienna, #E07A5F)' }} />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-alabaster">Professor Q</p>
+            <h2 id="tutor-dialog-title" className="text-sm font-bold text-alabaster">Professor Q</h2>
             <p className="text-[10px] text-smoke truncate">AI Tutor · Personalized Explanation</p>
           </div>
           <button
             onClick={onClose}
+            aria-label="Close Professor Q AI Tutor"
             className="w-7 h-7 rounded-lg flex items-center justify-center text-smoke hover:text-alabaster transition-colors"
             style={{ background: 'rgba(255,255,255,0.06)' }}
           >
@@ -155,7 +168,13 @@ export function TutorChat({ questionText, playerAnswer, correctAnswer, roomPin, 
         </div>
 
         {/* Message list */}
-        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3" style={{ minHeight: 0 }}>
+        <div
+          role="log"
+          aria-live="polite"
+          aria-label="Conversation with Professor Q"
+          className="flex-1 overflow-y-auto px-4 py-3 space-y-3"
+          style={{ minHeight: 0 }}
+        >
           <AnimatePresence initial={false}>
             {messages.map((msg, i) => (
               <motion.div
@@ -200,21 +219,18 @@ export function TutorChat({ questionText, playerAnswer, correctAnswer, roomPin, 
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
-                className="flex gap-2 items-center"
+                className="flex gap-2 items-center text-smoke text-xs"
               >
                 <div
-                  className="w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center"
+                  className="w-6 h-6 rounded-full flex items-center justify-center"
                   style={{ background: 'rgba(224,122,95,0.2)' }}
                 >
                   <Bot className="w-3 h-3" style={{ color: 'var(--color-sienna, #E07A5F)' }} />
                 </div>
-                <div
-                  className="px-3 py-2 rounded-xl text-xs flex items-center gap-2"
-                  style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#9a9a9a' }}
-                >
+                <span className="flex items-center gap-1.5 italic text-[11px]">
                   <Loader2 className="w-3 h-3 animate-spin" />
                   Professor Q is thinking…
-                </div>
+                </span>
               </motion.div>
             )}
           </AnimatePresence>
@@ -232,6 +248,7 @@ export function TutorChat({ questionText, playerAnswer, correctAnswer, roomPin, 
             onChange={e => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Ask a follow-up question…"
+            aria-label="Type your follow-up question for Professor Q"
             className="flex-1 text-xs rounded-lg px-3 py-2 bg-transparent outline-none text-alabaster placeholder:text-smoke"
             style={{ border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.04)' }}
             disabled={isLoading}
@@ -239,6 +256,7 @@ export function TutorChat({ questionText, playerAnswer, correctAnswer, roomPin, 
           <button
             onClick={handleSend}
             disabled={isLoading || !input.trim()}
+            aria-label="Send message to Professor Q"
             className="w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-150 flex-shrink-0"
             style={{
               background: input.trim() && !isLoading ? 'var(--color-sienna, #E07A5F)' : 'rgba(255,255,255,0.06)',

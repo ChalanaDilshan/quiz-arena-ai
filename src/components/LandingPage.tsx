@@ -36,6 +36,7 @@ function UserMenu({ onOpenAdmin }: { onOpenAdmin: () => void }) {
       <motion.button
         whileTap={{ scale: 0.96 }}
         onClick={signInWithGoogle}
+        aria-label="Sign in with Google to save quiz history"
         className="flex items-center gap-2 text-xs font-semibold px-3.5 py-2 rounded-xl border border-rim transition-all hover:border-sienna/50 hover:bg-sienna/5"
         style={{ color: 'var(--color-smoke)' }}
         title="Sign in with Google to save quiz history"
@@ -50,6 +51,8 @@ function UserMenu({ onOpenAdmin }: { onOpenAdmin: () => void }) {
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen((o) => !o)}
+        aria-label="User account menu"
+        aria-expanded={open}
         className="flex items-center gap-2 pl-1 pr-3 py-1 rounded-xl border border-rim hover:border-sienna/50 transition-colors"
         title={user.displayName ?? 'Account'}
       >

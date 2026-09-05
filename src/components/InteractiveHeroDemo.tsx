@@ -332,7 +332,7 @@ export function InteractiveHeroDemo({ onHost, onJoin }: InteractiveHeroDemoProps
         </AnimatePresence>
 
         {/* 2×2 Answer Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4 relative z-10">
+        <div role="radiogroup" aria-label="Demo Question Options" className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4 relative z-10">
           {currentQ.options.map((option, idx) => {
             const pad = PAD_COLORS[idx];
             const isSelected = selectedAnswer === idx;
@@ -357,6 +357,9 @@ export function InteractiveHeroDemo({ onHost, onJoin }: InteractiveHeroDemoProps
             return (
               <motion.button
                 key={`${qIndex}-${idx}`}
+                role="radio"
+                aria-checked={isSelected}
+                aria-label={`Option ${pad.letter}: ${option}${isRevealed ? (isCorrect ? ' — Correct Answer' : isSelected ? ' — Incorrect' : '') : ''}`}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: opacity, y: 0 }}
                 transition={{ duration: 0.3, delay: idx * 0.05 }}
@@ -427,6 +430,8 @@ export function InteractiveHeroDemo({ onHost, onJoin }: InteractiveHeroDemoProps
             >
               {/* Feedback Banner */}
               <div
+                role="status"
+                aria-live="polite"
                 className={`p-3 rounded-xl mb-3 text-xs flex items-start gap-2.5 ${
                   selectedAnswer === currentQ.correctIndex
                     ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400'
@@ -454,6 +459,7 @@ export function InteractiveHeroDemo({ onHost, onJoin }: InteractiveHeroDemoProps
               <div className="flex items-center gap-2">
                 <button
                   onClick={handleNextQuestion}
+                  aria-label="Try next demo question"
                   className="btn-primary text-xs !py-2 flex-1 flex items-center justify-center gap-1.5"
                 >
                   <span>Next Question</span>
@@ -461,6 +467,7 @@ export function InteractiveHeroDemo({ onHost, onJoin }: InteractiveHeroDemoProps
                 </button>
                 <button
                   onClick={handleResetDemo}
+                  aria-label="Reset interactive quiz demo"
                   className="btn-ghost text-xs !py-2 px-3 flex items-center gap-1"
                   title="Reset Demo"
                 >

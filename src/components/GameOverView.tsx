@@ -116,6 +116,18 @@ export function GameOverView({ players, playerId, session, isHost, isMockMode, h
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Close modals on Escape key
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowPrintModal(false);
+        setShowTutor(false);
+      }
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, []);
+
   // ── Auto-save quiz record for signed-in hosts ────────────────────────────
   useEffect(() => {
     if (!isHost || !user || !session) return;
@@ -193,7 +205,7 @@ export function GameOverView({ players, playerId, session, isHost, isMockMode, h
   };
 
   return (
-    <div className="min-h-screen bg-canvas flex flex-col items-center justify-center p-4 sm:p-6 py-12">
+    <main role="main" aria-label="Game Over and Final Standings" className="min-h-screen bg-canvas flex flex-col items-center justify-center p-4 sm:p-6 py-12">
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="w-full max-w-2xl text-center">
 
         {/* ── Title ────────────────────────────────────────────────── */}
@@ -327,6 +339,7 @@ export function GameOverView({ players, playerId, session, isHost, isMockMode, h
                 onClick={exportCsvReport}
                 className="btn-primary text-xs !py-2 !px-3.5 flex-1 sm:flex-none flex items-center justify-center gap-1.5"
                 title="Download CSV Spreadsheet"
+                aria-label="Download CSV Spreadsheet Report"
               >
                 <FileSpreadsheet className="w-3.5 h-3.5" />
                 <span>Export CSV</span>
@@ -336,6 +349,7 @@ export function GameOverView({ players, playerId, session, isHost, isMockMode, h
                 onClick={() => setShowPrintModal(true)}
                 className="btn-ghost text-xs !py-2 !px-3.5 flex-1 sm:flex-none flex items-center justify-center gap-1.5"
                 title="Print or Save as PDF Report"
+                aria-label="Print or Save as PDF Report"
               >
                 <Printer className="w-3.5 h-3.5 text-smoke" />
                 <span>Print PDF</span>
@@ -530,6 +544,9 @@ export function GameOverView({ players, playerId, session, isHost, isMockMode, h
         {showPrintModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm overflow-y-auto">
             <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="report-modal-title"
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
@@ -539,7 +556,7 @@ export function GameOverView({ players, playerId, session, isHost, isMockMode, h
               {/* Modal Header */}
               <div className="flex items-center justify-between pb-4 mb-5 border-b border-rim">
                 <div>
-                  <h2 className="text-xl font-extrabold text-alabaster">
+                  <h2 id="report-modal-title" className="text-xl font-extrabold text-alabaster">
                     Quiz Arena — Official Match Report
                   </h2>
                   <p className="text-xs text-smoke">
@@ -548,6 +565,7 @@ export function GameOverView({ players, playerId, session, isHost, isMockMode, h
                 </div>
                 <button
                   onClick={() => setShowPrintModal(false)}
+                  aria-label="Close match report modal"
                   className="w-8 h-8 rounded-lg flex items-center justify-center btn-ghost !p-0"
                 >
                   <X className="w-4 h-4" />
@@ -586,13 +604,13 @@ export function GameOverView({ players, playerId, session, isHost, isMockMode, h
 
                 {/* Attendance Table */}
                 <div className="border border-rim rounded-xl overflow-hidden">
-                  <table className="w-full text-left text-xs">
+                  <table className="w-full text-left text-xs" aria-label="Participants attendance and performance table">
                     <thead className="bg-canvas border-b border-rim text-smoke font-bold">
                       <tr>
-                        <th className="p-2.5">Rank</th>
-                        <th className="p-2.5">Participant</th>
-                        <th className="p-2.5">Score</th>
-                        <th className="p-2.5">Accuracy</th>
+                        <th scope="col" className="p-2.5">Rank</th>
+                        <th scope="col" className="p-2.5">Participant</th>
+                        <th scope="col" className="p-2.5">Score</th>
+                        <th scope="col" className="p-2.5">Accuracy</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-rim">
@@ -633,6 +651,6 @@ export function GameOverView({ players, playerId, session, isHost, isMockMode, h
           </div>
         )}
       </AnimatePresence>
-    </div>
+    </main>
   );
 }
