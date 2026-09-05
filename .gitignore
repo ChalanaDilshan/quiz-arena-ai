@@ -15,12 +15,19 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# Environment & Secrets
+# Environment & Secrets — NEVER commit any .env file
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+*.env
+**/.env
+**/.env.*
+server/.env
+server/strands_agents/.env
+!.env.example
+!**/.env.example
 
 # Editor & OS files
 .vscode/*
@@ -37,9 +44,10 @@ Thumbs.db
 # TypeScript cache
 *.tsbuildinfo
 
-# Firebase Service Account (NEVER commit this)
+# Firebase Service Account (NEVER commit this — use Docker secrets or env vars in production)
 serviceAccountKey.json
 server/serviceAccountKey.json
+**/serviceAccountKey.json
 
 # Python virtual environment
 server/strands_agents/.venv/

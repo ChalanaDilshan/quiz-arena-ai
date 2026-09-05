@@ -17,6 +17,12 @@ const app = express();
 const httpServer = createServer(app);
 const PORT = process.env.PORT || 3001;
 const STRANDS_URL = process.env.STRANDS_URL || 'http://127.0.0.1:8001';
+// Shared secret sent on every gateway→strands request.
+// Must match INTERNAL_SECRET in server/.env (used by strands-service).
+const INTERNAL_SECRET = process.env.INTERNAL_SECRET || '';
+// Comma-separated list of Google account emails allowed to call admin routes.
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
+  .split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
 
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173,http://localhost:5174')
   .split(',').map(o => o.trim());
@@ -380,6 +386,14 @@ const requireAgentAuth = async (req, res, next) => {
   const token = authHeader.split('Bearer ')[1];
   try {
     const decoded = await adminAuth.verifyIdToken(token);
+    // Email allowlist: if ADMIN_EMAILS is configured, reject unlisted accounts.
+    if (ADMIN_EMAILS.length > 0) {
+      const email = (decoded.email || '').toLowerCase();
+      if (!ADMIN_EMAILS.includes(email)) {
+        console.warn(`[Security] Admin access denied for email: ${email}`);
+        return res.status(403).json({ error: 'Forbidden: account not authorised for admin access' });
+      }
+    }
     req.user = decoded;
     next();
   } catch (err) {
@@ -429,7 +443,11 @@ const requireValidRoom = (req, res, next) => {
 async function callStrands(path, body = {}) {
   const res = await fetch(`${STRANDS_URL}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      // Internal shared secret — strands-service rejects requests without this.
+      'X-Internal-Token': INTERNAL_SECRET,
+    },
     body: JSON.stringify(body),
   });
   if (!res.ok) {
@@ -440,7 +458,9 @@ async function callStrands(path, body = {}) {
 }
 
 async function getStrands(path) {
-  const res = await fetch(`${STRANDS_URL}${path}`);
+  const res = await fetch(`${STRANDS_URL}${path}`, {
+    headers: { 'X-Internal-Token': INTERNAL_SECRET },
+  });
   if (!res.ok) throw new Error(`Strands GET error: ${res.status}`);
   return res.json();
 }
@@ -471,6 +491,8 @@ app.post('/api/commentary', apiLimiter, requireValidRoom, async (req, res) => {
 });
 
 // --- Autonomous Syllabus Agent (admin-only) ---
+// requireAgentAuth is placed FIRST so unauthenticated requests are rejected
+// before consuming any rate-limit budget (defence-in-depth ordering).
 app.post('/api/agent/trigger', requireAgentAuth, apiLimiter, async (req, res) => {
   try {
     const result = await callStrands('/syllabus/trigger', {});

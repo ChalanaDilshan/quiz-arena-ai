@@ -9,4 +9,8 @@ COPY . .
 
 EXPOSE 8001
 
+# Bind to 0.0.0.0 inside the container so Docker's internal routing works.
+# Port 8001 is NOT published in docker-compose.yml, so it is unreachable
+# from the host or internet — only the gateway container can call it via
+# Docker DNS (http://strands-service:8001).
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001"]

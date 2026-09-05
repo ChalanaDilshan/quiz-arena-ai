@@ -5,6 +5,10 @@ services:
       dockerfile: Dockerfile.strands
     env_file:
       - ./server/.env
+    # NO ports: published here — strands is internal-only.
+    # The gateway reaches it via Docker DNS: http://strands-service:8001
+    # Exposing port 8001 to the host would allow unauthenticated public access
+    # to all AI agent endpoints. Keep this block absent in production too.
     volumes:
       - ./server/syllabi:/app/syllabi
       - ./server/quizzes:/app/quizzes
@@ -23,7 +27,9 @@ services:
       # Instruct the Node.js gateway to route to the Python container via Docker DNS
       - STRANDS_URL=http://strands-service:8001
     volumes:
-      - ./server/serviceAccountKey.json:/app/serviceAccountKey.json
+      # NOTE: In production, replace this with a Docker secret or
+      # FIREBASE_SERVICE_ACCOUNT_JSON env var to avoid mounting key files.
+      - ./server/serviceAccountKey.json:/app/serviceAccountKey.json:ro
 
   frontend:
     build:

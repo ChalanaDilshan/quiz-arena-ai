@@ -206,25 +206,28 @@ git clone https://github.com/ChalanaDilshan/quiz-arena-ai.git
 cd quiz-arena-ai
 ```
 
-**`server/.env`** (create this file):
+**`server/.env`** (copy from `server/.env.example`):
 ```env
 GEMINI_API_KEY=your_gemini_api_key_here
 PORT=3001
 STRANDS_URL=http://127.0.0.1:8001
+INTERNAL_SECRET=your_32_char_random_hex_secret
 
 # Optional: AWS S3 for syllabus/quiz storage (falls back to local disk)
 AWS_S3_BUCKET_NAME=your-bucket-name
 AWS_REGION=us-east-1
 ```
 
-**`.env`** (root directory, create this file):
+**`.env`** (root directory, copy from `.env.example`):
 ```env
 VITE_API_URL=http://localhost:3001
+INTERNAL_SECRET=your_32_char_random_hex_secret
+ADMIN_EMAILS=your_admin_email@example.com
 ```
 
 **Firebase** (for admin features):
 - Download your Firebase Admin SDK JSON from the Firebase console
-- Save it as `server/serviceAccountKey.json`
+- Save it as `server/serviceAccountKey.json` (ensure it is never committed to source control)
 
 ### 2. Start All Services
 
@@ -333,18 +336,22 @@ quiz-arena-ai/
 
 ---
 
-## Security
+## Security & Adversarial Hardening
 
 | Mechanism | Implementation |
 |---|---|
-| **Firebase JWT Auth** | Admin and agent trigger routes validate `Authorization: Bearer <token>` headers |
+| **Internal Service Isolation** | Strands microservice does not expose any host ports in Docker; only accessible by gateway via internal Docker network DNS |
+| **Shared Secret Token Auth** | Outbound gateway requests include `X-Internal-Token` validated by FastAPI dependency before invoking any agent |
+| **Admin Route Access Control** | `/api/agent/*` protected with Firebase JWT authentication + verified against `ADMIN_EMAILS` allowlist |
+| **Defense-in-Depth Middleware** | Authentication checked prior to consuming rate-limiting quotas on sensitive routes |
 | **Rate Limiting** | 20 requests/minute per IP using `express-rate-limit` on all AI endpoints |
+| **Path Traversal Hardening** | Quiz file operations enforce strict regex `^quiz_[a-f0-9]{8}_[a-zA-Z0-9_\-]{1,35}\.json$` in addition to `Path(name).name` |
+| **CORS Lockdown** | Strands service restricts CORS to explicitly configured frontend origins with no cookie credentials |
 | **Prompt Injection Defense** | Structural sanitizer strips control characters (`\x00-\x1F`) and injection chars (`<>"'\``) before passing data to agents |
 | **Payload Size Limits** | Express restricts all JSON bodies to `10kb` to prevent Denial-of-Wallet attacks on the LLM API |
 | **Security Headers** | Full `Helmet.js` header suite (CSP, HSTS, X-Frame-Options, etc.) |
 | **Room Validation** | `requireValidRoom` middleware verifies every API call references a real, active game room |
 | **Hint Rate Limiting** | In-memory `Set` enforces one hint per `roomPin:playerId:questionIndex` key |
-| **Path Traversal Protection** | Syllabus and quiz file reads use `Path(filename).name` to strip any directory components |
 
 ---
 

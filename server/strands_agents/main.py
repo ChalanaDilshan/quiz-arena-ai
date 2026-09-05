@@ -23,7 +23,7 @@ from typing import Any
 import boto3
 import uvicorn
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from strands import Agent
@@ -39,6 +39,23 @@ load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
     raise RuntimeError("GEMINI_API_KEY not set in server/.env")
+
+# ---------------------------------------------------------------------------
+# Internal shared secret — gates all AI endpoints from direct external calls
+# ---------------------------------------------------------------------------
+# The gateway sends X-Internal-Token on every request to this service.
+# Set INTERNAL_SECRET to the same value in both .env files.
+INTERNAL_SECRET = os.environ.get("INTERNAL_SECRET", "")
+
+def verify_internal_token(x_internal_token: str = Header(default="")) -> None:
+    """FastAPI dependency: rejects any request missing the correct internal secret."""
+    if not INTERNAL_SECRET:
+        # If no secret is configured (local dev without env), skip check but warn.
+        import warnings
+        warnings.warn("INTERNAL_SECRET not set — internal auth is disabled!", stacklevel=2)
+        return
+    if x_internal_token != INTERNAL_SECRET:
+        raise HTTPException(status_code=401, detail="Unauthorized: missing or invalid internal token")
 
 AWS_S3_BUCKET_NAME = os.environ.get("AWS_S3_BUCKET_NAME")
 s3_client = boto3.client("s3") if AWS_S3_BUCKET_NAME else None
@@ -355,9 +372,12 @@ if not allowed_origins:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    # No credentials needed — this service is internal-only (gateway→strands).
+    # allow_credentials=True with a non-wildcard origin list is technically
+    # valid but unnecessary and widens the attack surface.
+    allow_credentials=False,
+    allow_methods=["POST", "GET"],
+    allow_headers=["Content-Type", "X-Internal-Token"],
 )
 
 
@@ -388,7 +408,7 @@ class HintRequest(BaseModel):
 
 # --- Endpoints ---
 
-@app.post("/commentary")
+@app.post("/commentary", dependencies=[Depends(verify_internal_token)])
 async def commentary(req: CommentaryRequest):
     safe_event   = sanitize(req.event_type, 50)
     safe_player  = sanitize(req.player_name, 80)
@@ -409,7 +429,7 @@ async def commentary(req: CommentaryRequest):
     return {"comment": str(result)}
 
 
-@app.post("/tutor")
+@app.post("/tutor", dependencies=[Depends(verify_internal_token)])
 async def tutor(req: TutorRequest):
     safe_q  = sanitize(req.question_text, 500)
     safe_pa = sanitize(req.player_answer, 200)
@@ -445,7 +465,7 @@ async def tutor(req: TutorRequest):
     return {"explanation": str(result), "session_id": session_id}
 
 
-@app.post("/syllabus/trigger")
+@app.post("/syllabus/trigger", dependencies=[Depends(verify_internal_token)])
 async def syllabus_trigger(_: SyllabusRequest = SyllabusRequest()):
     agent = build_syllabus_agent()
     result = agent(
@@ -478,7 +498,7 @@ async def syllabus_trigger(_: SyllabusRequest = SyllabusRequest()):
     return {"agent_summary": str(result), "pending_quiz": latest_quiz}
 
 
-@app.get("/syllabus/pending")
+@app.get("/syllabus/pending", dependencies=[Depends(verify_internal_token)])
 async def syllabus_pending():
     """Return the most recently saved quiz draft (for Admin Dashboard polling)."""
     if AWS_S3_BUCKET_NAME:
@@ -508,13 +528,20 @@ async def syllabus_pending():
     return {"pending_quiz": None}
 
 
-@app.post("/syllabus/approve")
+# Strict quiz filename pattern: quiz_<8 hex chars>_<safe topic>.json
+_QUIZ_FILENAME_RE = re.compile(r'^quiz_[a-f0-9]{8}_[a-zA-Z0-9_\-]{1,35}\.json$')
+
+
+@app.post("/syllabus/approve", dependencies=[Depends(verify_internal_token)])
 async def syllabus_approve(body: dict):
     filename = body.get("filename")
     if not filename:
         raise HTTPException(status_code=400, detail="filename required")
+    # Strip directory components AND enforce strict naming pattern
     safe_name = Path(filename).name
-    
+    if not _QUIZ_FILENAME_RE.match(safe_name):
+        raise HTTPException(status_code=400, detail="Invalid filename format")
+
     if AWS_S3_BUCKET_NAME:
         try:
             obj_resp = s3_client.get_object(Bucket=AWS_S3_BUCKET_NAME, Key=f"quizzes/{safe_name}")
@@ -538,11 +565,14 @@ async def syllabus_approve(body: dict):
     return {"success": True}
 
 
-@app.post("/syllabus/clear")
+@app.post("/syllabus/clear", dependencies=[Depends(verify_internal_token)])
 async def syllabus_clear(body: dict = {}):
     filename = body.get("filename")
     if filename:
         safe_name = Path(filename).name
+        # Enforce strict naming pattern before any filesystem operation
+        if not _QUIZ_FILENAME_RE.match(safe_name):
+            raise HTTPException(status_code=400, detail="Invalid filename format")
         if AWS_S3_BUCKET_NAME:
             try:
                 s3_client.delete_object(Bucket=AWS_S3_BUCKET_NAME, Key=f"quizzes/{safe_name}")
@@ -557,7 +587,7 @@ async def syllabus_clear(body: dict = {}):
 
 # --- Hint Master ---
 
-@app.post("/hint")
+@app.post("/hint", dependencies=[Depends(verify_internal_token)])
 async def hint(req: HintRequest):
     safe_question = sanitize(req.question_text, 500)
     safe_options  = [sanitize(opt, 120) for opt in req.options[:4]]
@@ -582,4 +612,7 @@ async def health():
 
 
 if __name__ == "__main__":
+    # When run directly (dev), bind to loopback only.
+    # In Docker, CMD in Dockerfile.strands binds to 127.0.0.1 and the port
+    # is NOT published, so it remains inaccessible from outside the container.
     uvicorn.run("main:app", host="127.0.0.1", port=8001, reload=False)
