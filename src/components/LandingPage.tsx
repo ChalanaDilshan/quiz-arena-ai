@@ -9,6 +9,7 @@ import {
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { InteractiveHeroDemo } from './InteractiveHeroDemo';
+import { LegalModal, type LegalTab } from './LegalModal';
 
 interface LandingPageProps {
   onHost: () => void;
@@ -248,6 +249,8 @@ function FaqItem({ question, answer }: { question: string; answer: string }) {
 // ── Main LandingPage Component ───────────────────────────────────────────────
 export function LandingPage({ onHost, onJoin, onOpenAdmin }: LandingPageProps) {
   const [activeTab, setActiveTab] = useState<'host' | 'player' | 'ai'>('host');
+  const [legalModalOpen, setLegalModalOpen] = useState(false);
+  const [legalTab, setLegalTab] = useState<LegalTab>('privacy');
 
   const stats = [
     { value: '< 5s', label: 'AI Question Generation', icon: <Brain className="w-4 h-4 text-sienna" /> },
@@ -763,12 +766,34 @@ export function LandingPage({ onHost, onJoin, onOpenAdmin }: LandingPageProps) {
             <span className="font-semibold text-alabaster">Developed by Chalana Dilshan</span>
           </div>
 
+          <div className="flex items-center gap-4 text-xs">
+            <button
+              onClick={() => { setLegalTab('privacy'); setLegalModalOpen(true); }}
+              className="text-smoke hover:text-alabaster transition-colors underline-offset-2 hover:underline cursor-pointer"
+            >
+              Privacy Policy
+            </button>
+            <span className="text-smoke/40">•</span>
+            <button
+              onClick={() => { setLegalTab('terms'); setLegalModalOpen(true); }}
+              className="text-smoke hover:text-alabaster transition-colors underline-offset-2 hover:underline cursor-pointer"
+            >
+              Terms of Service
+            </button>
+          </div>
+
           <div className="flex items-center gap-3">
             <span className="text-xs text-smoke font-medium">Dark / Light Mode</span>
             <ThemeToggleButton />
           </div>
         </div>
       </footer>
+
+      <LegalModal
+        isOpen={legalModalOpen}
+        onClose={() => setLegalModalOpen(false)}
+        initialTab={legalTab}
+      />
     </div>
   );
 }

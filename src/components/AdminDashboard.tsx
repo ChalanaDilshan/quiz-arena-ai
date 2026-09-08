@@ -15,6 +15,7 @@ import {
 import { UserProfileCard } from './UserProfileCard';
 import { trackDailyLogin, type LoginData } from '../utils/userProfile';
 import type { Player, Question } from '../types';
+import { LegalModal, type LegalTab } from './LegalModal';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -608,6 +609,8 @@ export function AdminDashboard({ onBack, onRehost }: AdminDashboardProps) {
   const [pendingQuiz, setPendingQuiz] = useState<Question[] | null>(null);
   const [isApproving, setIsApproving] = useState(false);
   const [isTriggering, setIsTriggering] = useState(false);
+  const [legalModalOpen, setLegalModalOpen] = useState(false);
+  const [legalTab, setLegalTab] = useState<LegalTab>('privacy');
 
   useEffect(() => {
     if (!user) return;
@@ -1012,6 +1015,34 @@ export function AdminDashboard({ onBack, onRehost }: AdminDashboardProps) {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Footer with Legal Links */}
+        <div className="mt-12 pt-6 border-t border-rim flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-smoke">
+          <p>
+            Quiz Arena · Empowering educators with real-time AI assessments
+          </p>
+          <div className="flex items-center gap-3 text-[11px]">
+            <button
+              onClick={() => { setLegalTab('privacy'); setLegalModalOpen(true); }}
+              className="hover:text-alabaster transition-colors underline-offset-2 hover:underline cursor-pointer"
+            >
+              Privacy Policy
+            </button>
+            <span className="text-smoke/40">·</span>
+            <button
+              onClick={() => { setLegalTab('terms'); setLegalModalOpen(true); }}
+              className="hover:text-alabaster transition-colors underline-offset-2 hover:underline cursor-pointer"
+            >
+              Terms of Service
+            </button>
+          </div>
+        </div>
+
+        <LegalModal
+          isOpen={legalModalOpen}
+          onClose={() => setLegalModalOpen(false)}
+          initialTab={legalTab}
+        />
       </div>
     </div>
   );

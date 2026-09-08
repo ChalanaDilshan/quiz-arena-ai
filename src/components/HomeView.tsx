@@ -7,6 +7,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { getSavedQuizzes, type SavedQuiz } from '../utils/quizHistory';
 import { extractTextFromPdf } from '../utils/pdfExtractor';
+import { LegalModal, type LegalTab } from './LegalModal';
 
 interface HomeViewProps {
   onJoinGame: (pin: string, nickname: string) => void;
@@ -46,6 +47,8 @@ export function HomeView({ onJoinGame, onHostGame, onHostSavedQuiz, uploadProgre
   const pinRefs = useRef<(HTMLInputElement | null)[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const { user, signInWithGoogle } = useAuth();
+  const [legalModalOpen, setLegalModalOpen] = useState(false);
+  const [legalTab, setLegalTab] = useState<LegalTab>('privacy');
   
   const [savedQuizzes, setSavedQuizzes] = useState<SavedQuiz[]>([]);
   
@@ -578,9 +581,34 @@ export function HomeView({ onJoinGame, onHostGame, onHostSavedQuiz, uploadProgre
       </div>
     </div>
 
-        <p className="text-center text-xs mt-5 text-smoke">
-          AI-powered · Developed by <span className="font-semibold text-alabaster">Chalana Dilshan</span>
-        </p>
+        <div className="text-center text-xs mt-5 text-smoke space-y-2">
+          <p>
+            AI-powered · Developed by <span className="font-semibold text-alabaster">Chalana Dilshan</span>
+          </p>
+          <div className="flex items-center justify-center gap-3 text-[11px]">
+            <button
+              type="button"
+              onClick={() => { setLegalTab('privacy'); setLegalModalOpen(true); }}
+              className="text-smoke hover:text-alabaster transition-colors underline-offset-2 hover:underline cursor-pointer"
+            >
+              Privacy Policy
+            </button>
+            <span className="text-smoke/40">·</span>
+            <button
+              type="button"
+              onClick={() => { setLegalTab('terms'); setLegalModalOpen(true); }}
+              className="text-smoke hover:text-alabaster transition-colors underline-offset-2 hover:underline cursor-pointer"
+            >
+              Terms of Service
+            </button>
+          </div>
+        </div>
+
+        <LegalModal
+          isOpen={legalModalOpen}
+          onClose={() => setLegalModalOpen(false)}
+          initialTab={legalTab}
+        />
       </motion.div>
     </div>
   );
