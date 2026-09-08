@@ -10,16 +10,30 @@ export interface LoginData {
   loginDates: string[]; // List of YYYY-MM-DD
 }
 
+export type BadgeIconType =
+  | 'Sun'
+  | 'Flame'
+  | 'Shield'
+  | 'Compass'
+  | 'Trophy'
+  | 'Target'
+  | 'Users'
+  | 'Crown';
+
 export interface UserBadge {
   id: string;
   title: string;
-  icon: string;
+  iconName: BadgeIconType;
   description: string;
   requirement: string;
   unlocked: boolean;
-  progressText?: string;
+  currentValue: number;
+  targetValue: number;
+  progressRatio: number; // 0 to 1
+  progressLabel: string;
   gradient: [string, string];
-  category: 'streak' | 'host' | 'achievement';
+  accent: string;
+  category: 'streak' | 'host' | 'mastery';
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -127,90 +141,122 @@ export function getUserBadges(
   return [
     {
       id: 'daily_logger',
-      title: 'Daily Logger',
-      icon: '🌅',
-      description: 'Logged in to Quiz Arena',
-      requirement: 'Log in at least once',
+      title: 'Daily Presence',
+      iconName: 'Sun',
+      description: 'Logged in to Quiz Arena today',
+      requirement: 'Sign in to your account',
       unlocked: loginData.totalLogins >= 1,
-      progressText: loginData.totalLogins >= 1 ? 'Unlocked' : '0/1 Logins',
-      gradient: ['#F59E0B', '#F97316'],
+      currentValue: Math.min(loginData.totalLogins, 1),
+      targetValue: 1,
+      progressRatio: loginData.totalLogins >= 1 ? 1 : 0,
+      progressLabel: loginData.totalLogins >= 1 ? 'Earned' : '0 of 1 visit',
+      gradient: ['#F59E0B', '#D97706'],
+      accent: '#F59E0B',
       category: 'streak',
     },
     {
       id: 'streak_3',
       title: '3-Day Streak',
-      icon: '🔥',
-      description: '3 consecutive login days',
-      requirement: 'Maintain a 3-day login streak',
+      iconName: 'Flame',
+      description: 'Active 3 consecutive days',
+      requirement: '3-day consecutive login streak',
       unlocked: currentOrLongestStreak >= 3,
-      progressText: currentOrLongestStreak >= 3 ? 'Unlocked' : `${currentOrLongestStreak}/3 Days`,
-      gradient: ['#EF4444', '#F97316'],
+      currentValue: Math.min(currentOrLongestStreak, 3),
+      targetValue: 3,
+      progressRatio: Math.min(currentOrLongestStreak / 3, 1),
+      progressLabel: currentOrLongestStreak >= 3 ? 'Earned' : `${currentOrLongestStreak} of 3 days`,
+      gradient: ['#EF4444', '#EA580C'],
+      accent: '#EF4444',
       category: 'streak',
     },
     {
       id: 'streak_7',
       title: 'Week Warrior',
-      icon: '⚔️',
-      description: '7 consecutive login days',
-      requirement: 'Maintain a 7-day login streak',
+      iconName: 'Shield',
+      description: 'Active 7 consecutive days',
+      requirement: '7-day consecutive login streak',
       unlocked: currentOrLongestStreak >= 7,
-      progressText: currentOrLongestStreak >= 7 ? 'Unlocked' : `${currentOrLongestStreak}/7 Days`,
-      gradient: ['#8B5CF6', '#EC4899'],
+      currentValue: Math.min(currentOrLongestStreak, 7),
+      targetValue: 7,
+      progressRatio: Math.min(currentOrLongestStreak / 7, 1),
+      progressLabel: currentOrLongestStreak >= 7 ? 'Earned' : `${currentOrLongestStreak} of 7 days`,
+      gradient: ['#8B5CF6', '#7C3AED'],
+      accent: '#8B5CF6',
       category: 'streak',
     },
     {
       id: 'first_quiz',
-      title: 'First Quiz',
-      icon: '🎯',
-      description: 'Hosted your first quiz session',
-      requirement: 'Host 1 quiz',
+      title: 'First Flight',
+      iconName: 'Compass',
+      description: 'Hosted your first quiz match',
+      requirement: 'Host 1 quiz session',
       unlocked: totalGames >= 1,
-      progressText: totalGames >= 1 ? 'Unlocked' : `${totalGames}/1 Quizzes`,
-      gradient: ['#10B981', '#3B82F6'],
+      currentValue: Math.min(totalGames, 1),
+      targetValue: 1,
+      progressRatio: totalGames >= 1 ? 1 : 0,
+      progressLabel: totalGames >= 1 ? 'Earned' : '0 of 1 quiz',
+      gradient: ['#10B981', '#059669'],
+      accent: '#10B981',
       category: 'host',
     },
     {
       id: 'quiz_master',
       title: 'Quiz Master',
-      icon: '🏆',
-      description: 'Hosted 10+ quiz sessions',
-      requirement: 'Host 10 quizzes',
+      iconName: 'Trophy',
+      description: 'Hosted 10 quiz sessions',
+      requirement: 'Host 10 quiz sessions',
       unlocked: totalGames >= 10,
-      progressText: totalGames >= 10 ? 'Unlocked' : `${totalGames}/10 Quizzes`,
-      gradient: ['#F59E0B', '#EAB308'],
+      currentValue: Math.min(totalGames, 10),
+      targetValue: 10,
+      progressRatio: Math.min(totalGames / 10, 1),
+      progressLabel: totalGames >= 10 ? 'Earned' : `${totalGames} of 10 hosted`,
+      gradient: ['#F59E0B', '#B45309'],
+      accent: '#F59E0B',
       category: 'host',
     },
     {
       id: 'accuracy_ace',
-      title: 'Accuracy Ace',
-      icon: '🎓',
-      description: 'Achieved 90%+ room accuracy',
-      requirement: 'Any quiz with 90%+ accuracy',
+      title: 'Precision Host',
+      iconName: 'Target',
+      description: 'Room accuracy reached 90%+',
+      requirement: 'Any quiz session with 90%+ accuracy',
       unlocked: bestAcc >= 90,
-      progressText: bestAcc >= 90 ? 'Unlocked' : `${bestAcc}% / 90% Best`,
-      gradient: ['#06B6D4', '#3B82F6'],
-      category: 'achievement',
+      currentValue: bestAcc,
+      targetValue: 90,
+      progressRatio: Math.min(bestAcc / 90, 1),
+      progressLabel: bestAcc >= 90 ? 'Earned' : `${bestAcc}% of 90%`,
+      gradient: ['#06B6D4', '#0284C7'],
+      accent: '#06B6D4',
+      category: 'mastery',
     },
     {
       id: 'crowd_pleaser',
-      title: 'Crowd Pleaser',
-      icon: '👥',
-      description: 'Hosted a session with 5+ players',
-      requirement: '5+ players in a single game',
+      title: 'Packed Arena',
+      iconName: 'Users',
+      description: 'Hosted room with 5+ players',
+      requirement: '5+ players in a single match',
       unlocked: maxPlayersInGame >= 5,
-      progressText: maxPlayersInGame >= 5 ? 'Unlocked' : `${maxPlayersInGame}/5 Players`,
-      gradient: ['#6366F1', '#A855F7'],
-      category: 'achievement',
+      currentValue: Math.min(maxPlayersInGame, 5),
+      targetValue: 5,
+      progressRatio: Math.min(maxPlayersInGame / 5, 1),
+      progressLabel: maxPlayersInGame >= 5 ? 'Earned' : `${maxPlayersInGame} of 5 players`,
+      gradient: ['#6366F1', '#4F46E5'],
+      accent: '#6366F1',
+      category: 'mastery',
     },
     {
       id: 'legend_host',
-      title: 'Legend Host',
-      icon: '👑',
-      description: 'Hosted 50+ quiz sessions',
-      requirement: 'Host 50 quizzes',
+      title: 'Grandmaster',
+      iconName: 'Crown',
+      description: 'Hosted 50 quiz sessions',
+      requirement: 'Host 50 quiz sessions',
       unlocked: totalGames >= 50,
-      progressText: totalGames >= 50 ? 'Unlocked' : `${totalGames}/50 Quizzes`,
-      gradient: ['#EC4899', '#F43F5E'],
+      currentValue: Math.min(totalGames, 50),
+      targetValue: 50,
+      progressRatio: Math.min(totalGames / 50, 1),
+      progressLabel: totalGames >= 50 ? 'Earned' : `${totalGames} of 50 hosted`,
+      gradient: ['#EC4899', '#BE185D'],
+      accent: '#EC4899',
       category: 'host',
     },
   ];
