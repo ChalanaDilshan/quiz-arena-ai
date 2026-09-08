@@ -716,7 +716,7 @@ export function AdminDashboard({ onBack, onRehost }: AdminDashboardProps) {
           backdropFilter: 'blur(16px)',
         }}
       >
-        <div className="max-w-3xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
           {/* Logo + Back */}
           <div className="flex items-center gap-3">
             <button
@@ -779,7 +779,7 @@ export function AdminDashboard({ onBack, onRehost }: AdminDashboardProps) {
       </header>
 
       {/* ── Body ────────────────────────────────────────────────────────── */}
-      <div className="max-w-3xl mx-auto px-4 pt-24 pb-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-16">
         <AnimatePresence mode="wait">
           {selectedRecord ? (
             <QuizDetailView
