@@ -4,7 +4,26 @@ import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
 
-// ── Polyfill toHex for pdfjs-dist in Node.js test environment ────────────────
+// ── Polyfills for Node.js test environment (Node 20 compatibility) ───────────
+if (typeof globalThis.Iterator === 'undefined') {
+  globalThis.Iterator = function () {};
+  globalThis.Iterator.prototype = {};
+}
+if (!Promise.withResolvers) {
+  Promise.withResolvers = function () {
+    let resolve, reject;
+    const promise = new Promise((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    return { promise, resolve, reject };
+  };
+}
+if (!Promise.try) {
+  Promise.try = function (fn, ...args) {
+    return new Promise((resolve) => resolve(fn(...args)));
+  };
+}
 if (!Uint8Array.prototype.toHex) {
   Uint8Array.prototype.toHex = function () {
     return Array.from(this)

@@ -216,8 +216,8 @@ def sanitize(text: str, max_len: int = 500) -> str:
         text = str(text)
     # Strip non-whitespace control characters while preserving \n and \t for formatted syllabus text
     text = re.sub(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]", "", text)
-    # Strip dangerous HTML/XML injection characters
-    text = re.sub(r"[<>]", "", text)
+    # Strip dangerous HTML/XML/injection characters (< > ' `)
+    text = re.sub(r"[<>'`]", "", text)
     return text[:max_len]
 
 
