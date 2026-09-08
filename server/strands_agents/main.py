@@ -214,8 +214,10 @@ def safe_agent_call(agent: Agent, prompt: str, fallback_type: str = "general", c
 def sanitize(text: str, max_len: int = 500) -> str:
     if not isinstance(text, str):
         text = str(text)
-    text = re.sub(r"[\x00-\x1F\x7F]", "", text)   # control chars
-    text = re.sub(r"[<>\"'`]", "", text)            # injection chars
+    # Strip non-whitespace control characters while preserving \n and \t for formatted syllabus text
+    text = re.sub(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]", "", text)
+    # Strip dangerous HTML/XML injection characters
+    text = re.sub(r"[<>]", "", text)
     return text[:max_len]
 
 
@@ -795,7 +797,7 @@ async def hint(req: HintRequest):
 async def generate_quiz(req: GenerateQuizRequest):
     safe_topic = sanitize(req.topic, 100) or "AWS & Cloud Fundamentals"
     safe_diff = sanitize(req.difficulty, 30) or "Medium"
-    safe_text = sanitize(req.syllabus_text, 4000)
+    safe_text = sanitize(req.syllabus_text, 10000)
     num_q = max(2, min(req.num_questions, 20))
 
     agent = build_quiz_generator_agent()

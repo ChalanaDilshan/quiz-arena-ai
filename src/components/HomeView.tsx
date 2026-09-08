@@ -6,10 +6,11 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getSavedQuizzes, type SavedQuiz } from '../utils/quizHistory';
+import { extractTextFromPdf } from '../utils/pdfExtractor';
 
 interface HomeViewProps {
   onJoinGame: (pin: string, nickname: string) => void;
-  onHostGame: (file: File, numQuestions: number, difficulty: string) => void;
+  onHostGame: (file: File, numQuestions: number, difficulty: string, extractedText?: string) => void;
   uploadProgress: number;
   error: string | null;
   initialTab?: 'join' | 'host';
@@ -76,23 +77,44 @@ export function HomeView({ onJoinGame, onHostGame, onHostSavedQuiz, uploadProgre
   const fullPin = pin.join('');
   const canJoin = fullPin.length === 6 && nickname.trim().length >= 2;
 
+  const [extractedText, setExtractedText] = useState<string>('');
+  const [extractionStats, setExtractionStats] = useState<{ wordCount: number; numPages: number } | null>(null);
+  const [isExtracting, setIsExtracting] = useState<boolean>(false);
+
   const MAX_FILE_SIZE_MB = 25;
   const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
-  const validateAndSetFile = (f: File) => {
+  const validateAndSetFile = async (f: File) => {
     const isPdf = f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf');
     if (!isPdf) {
       setFileError('Only PDF files are allowed.');
       setSelectedFile(null);
+      setExtractedText('');
+      setExtractionStats(null);
       return;
     }
     if (f.size > MAX_FILE_SIZE_BYTES) {
       setFileError(`File exceeds the ${MAX_FILE_SIZE_MB}MB limit (${(f.size / (1024 * 1024)).toFixed(1)} MB).`);
       setSelectedFile(null);
+      setExtractedText('');
+      setExtractionStats(null);
       return;
     }
     setSelectedFile(f);
     setFileError(null);
+
+    setIsExtracting(true);
+    try {
+      const res = await extractTextFromPdf(f);
+      setExtractedText(res.text);
+      setExtractionStats({ wordCount: res.wordCount, numPages: res.numPages });
+    } catch (err) {
+      console.warn('[PDFExtractor] Extraction notice:', err);
+      setExtractedText('');
+      setExtractionStats(null);
+    } finally {
+      setIsExtracting(false);
+    }
   };
 
   const handleDragOver = (e: DragEvent) => { e.preventDefault(); setIsDragging(true); };
@@ -372,6 +394,16 @@ export function HomeView({ onJoinGame, onHostGame, onHostSavedQuiz, uploadProgre
                               <p className="text-xs mt-1 text-smoke font-medium">
                                 {(selectedFile.size / 1024 / 1024).toFixed(2)} MB · PDF ready
                               </p>
+                              {isExtracting && (
+                                <p className="text-[11px] text-amber-400 font-semibold mt-1 animate-pulse">
+                                  Extracting syllabus text…
+                                </p>
+                              )}
+                              {extractionStats && !isExtracting && (
+                                <p className="text-[11px] text-emerald-400 font-semibold mt-1">
+                                  ✓ Extracted {extractionStats.wordCount.toLocaleString()} words ({extractionStats.numPages} {extractionStats.numPages === 1 ? 'page' : 'pages'})
+                                </p>
+                              )}
                               <span className="text-[11px] text-sienna font-semibold mt-2 hover:underline">
                                 Click to replace file
                               </span>
@@ -532,8 +564,8 @@ export function HomeView({ onJoinGame, onHostGame, onHostSavedQuiz, uploadProgre
                     </motion.div>
                   )}
 
-                  <button onClick={() => selectedFile && onHostGame(selectedFile, numQuestions, difficulty)}
-                    disabled={!selectedFile || (uploadProgress > 0 && uploadProgress < 100)}
+                  <button onClick={() => selectedFile && onHostGame(selectedFile, numQuestions, difficulty, extractedText)}
+                    disabled={!selectedFile || isExtracting || (uploadProgress > 0 && uploadProgress < 100)}
                     className="btn-primary w-full">
                     <Sparkles className="w-4 h-4" /> Generate {numQuestions} Questions
                   </button>

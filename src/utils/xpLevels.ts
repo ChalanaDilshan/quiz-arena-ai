@@ -1,5 +1,13 @@
 import { getQuizHistory } from './quizHistory';
 
+/**
+ * ARCHITECTURAL NOTE — Client-Side Local Storage Model:
+ *
+ * XP tier calculations derive from localStorage quiz history (`qa_history_${uid}`).
+ * Designed for instantaneous, zero-latency client presentation. In competitive environments,
+ * tier thresholds can be backed and verified by server-side game records.
+ */
+
 // ─── XP Tier Definitions ─────────────────────────────────────────────────────
 
 export interface XpLevel {

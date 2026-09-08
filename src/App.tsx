@@ -125,9 +125,9 @@ function App() {
             initialTab={initialTab}
             initialPin={initialPin}
             onJoinGame={game.joinGame}
-            onHostGame={(file, numQ, diff) => {
+            onHostGame={(file, numQ, diff, extractedText) => {
               setHostFileName(file.name);
-              game.hostGame(file, numQ, diff);
+              game.hostGame(file, numQ, diff, extractedText);
             }}
             onHostSavedQuiz={(quiz) => {
               setHostFileName(quiz.topic);

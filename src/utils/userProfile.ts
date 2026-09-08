@@ -1,5 +1,21 @@
 import type { QuizRecord } from './quizHistory';
 
+/**
+ * ARCHITECTURAL NOTE — Client-Side Local Storage Model:
+ *
+ * The streak and badge calculations below currently derive from local client state
+ * stored in `localStorage` (`qa_login_${uid}` and `qa_history_${uid}`).
+ *
+ * This design provides instantaneous, offline-capable host feedback with zero
+ * server database overhead. Because client storage is accessible via browser DevTools,
+ * these achievements are cosmetic host motivators rather than server-verified credentials.
+ *
+ * Roadmap for Verified Environments:
+ * For competitive or institutional deployments, achievements should be verified
+ * server-side via authenticated endpoints (e.g. Firebase Firestore / PostgreSQL)
+ * recording server-timestamped game completions and verified login streaks.
+ */
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface LoginData {

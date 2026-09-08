@@ -653,7 +653,7 @@ app.post('/api/generate-quiz', apiLimiter, async (req, res) => {
 
   try {
     const result = await callStrands('/generate-quiz', {
-      syllabus_text: typeof syllabusText === 'string' ? syllabusText.slice(0, 4000) : '',
+      syllabus_text: typeof syllabusText === 'string' ? syllabusText.slice(0, 10000) : '',
       topic: typeof topic === 'string' ? topic.slice(0, 100) : 'AWS & Cloud Architecture',
       num_questions: Number(numQuestions) || 5,
       difficulty: typeof difficulty === 'string' ? difficulty.slice(0, 30) : 'Medium',

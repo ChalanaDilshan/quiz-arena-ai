@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
+import { extractTextFromPdf } from '../utils/pdfExtractor';
 import type { GameState, Question, Player, QuizSession } from '../types';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -104,7 +105,7 @@ export interface UseQuizGameReturn {
 
   // Actions
   joinGame: (pin: string, nickname: string) => void;
-  hostGame: (file: File, numQuestions: number, difficulty: string) => void;
+  hostGame: (file: File, numQuestions: number, difficulty: string, extractedText?: string) => void;
   hostSavedQuiz: (quiz: { topic: string; questions: Question[] }) => void;
   startGame: () => void;
   submitAnswer: (answerIndex: number) => void;
@@ -419,7 +420,7 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
   );
 
   const hostGame = useCallback(
-    (_file: File, numQuestions: number, difficulty: string) => {
+    async (_file: File, numQuestions: number, difficulty: string, extractedText?: string) => {
       setError(null);
 
       if (useMockMode) {
@@ -484,6 +485,17 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
       const url = import.meta.env.VITE_API_URL || 'http://localhost:3001';
       const topicName = _file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
 
+      let syllabusContent = extractedText;
+      if (!syllabusContent) {
+        try {
+          const res = await extractTextFromPdf(_file);
+          syllabusContent = res.text;
+        } catch (err) {
+          console.warn('[useQuizGame] PDF extraction notice:', err);
+          syllabusContent = '';
+        }
+      }
+
       fetch(`${url}/api/generate-quiz`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -491,7 +503,7 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
           topic: topicName,
           numQuestions,
           difficulty,
-          syllabusText: `Lecture Document: ${_file.name}. Generating ${numQuestions} ${difficulty} questions on ${topicName}.`
+          syllabusText: syllabusContent || `Lecture Document: ${_file.name}. Generating ${numQuestions} ${difficulty} questions on ${topicName}.`
         })
       })
         .then(async (res) => {
