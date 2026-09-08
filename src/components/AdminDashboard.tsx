@@ -12,6 +12,8 @@ import {
   getQuizHistory, deleteQuizRecord, saveQuiz,
   type QuizRecord,
 } from '../utils/quizHistory';
+import { UserProfileCard } from './UserProfileCard';
+import { trackDailyLogin, type LoginData } from '../utils/userProfile';
 import type { Player, Question } from '../types';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -557,6 +559,15 @@ export function AdminDashboard({ onBack, onRehost }: AdminDashboardProps) {
   const [records, setRecords] = useState<QuizRecord[]>(() =>
     user ? getQuizHistory(user.uid) : [],
   );
+  const [loginData, setLoginData] = useState<LoginData | undefined>(() =>
+    user ? trackDailyLogin(user.uid) : undefined,
+  );
+
+  useEffect(() => {
+    if (!user) return;
+    const data = trackDailyLogin(user.uid);
+    setLoginData(data);
+  }, [user]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<
@@ -785,6 +796,9 @@ export function AdminDashboard({ onBack, onRehost }: AdminDashboardProps) {
               exit={{ opacity: 0, x: 24 }}
               transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
             >
+              {/* User Profile Card with XP Level & Badges */}
+              <UserProfileCard records={records} loginData={loginData} />
+
               {/* Page Title */}
               <div className="mb-8">
                 <h1 className="text-2xl font-extrabold tracking-tight text-alabaster">
