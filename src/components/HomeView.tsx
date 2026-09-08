@@ -6,8 +6,6 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getSavedQuizzes, type SavedQuiz } from '../utils/quizHistory';
-import { getUserXpStats } from '../utils/xpLevels';
-import { XpBadge } from './XpBadge';
 
 interface HomeViewProps {
   onJoinGame: (pin: string, nickname: string) => void;
@@ -312,9 +310,29 @@ export function HomeView({ onJoinGame, onHostGame, onHostSavedQuiz, uploadProgre
                           </motion.div>
                         )}
 
-                        {/* Signed-in badge with XP level */}
+                        {/* Signed-in confirmation */}
                         {user && (
-                          <SignedInXpBanner userId={user.uid} photoURL={user.photoURL} />
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            className="mb-4 px-3.5 py-2.5 rounded-xl border flex items-center gap-2.5 overflow-hidden"
+                            style={{ background: 'rgba(34,197,94,0.05)', borderColor: 'rgba(34,197,94,0.22)' }}
+                          >
+                            {user.photoURL ? (
+                              <img
+                                src={user.photoURL}
+                                alt="Your avatar"
+                                className="w-5 h-5 rounded-full flex-shrink-0 ring-1 ring-emerald-400/40"
+                              />
+                            ) : (
+                              <span className="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center text-[9px] font-bold text-emerald-400 flex-shrink-0">
+                                ✓
+                              </span>
+                            )}
+                            <p className="text-[11px] font-semibold text-emerald-400 truncate">
+                              Quiz will be saved to your dashboard
+                            </p>
+                          </motion.div>
                         )}
 
                         {/* Enhanced Dropzone with Explicit Drag-Over State */}
@@ -536,37 +554,5 @@ export function HomeView({ onJoinGame, onHostGame, onHostSavedQuiz, uploadProgre
   );
 }
 
-// ── Signed-in XP Banner ───────────────────────────────────────────────────────
-// Separated so it can call hooks unconditionally.
-function SignedInXpBanner({ userId, photoURL }: { userId: string; photoURL: string | null }) {
-  const xpStats = useMemo(() => getUserXpStats(userId), [userId]);
 
-  return (
-    <motion.div
-      initial={{ opacity: 0, height: 0 }}
-      animate={{ opacity: 1, height: 'auto' }}
-      className="mb-4 px-3.5 py-3 rounded-xl border overflow-hidden"
-      style={{ background: 'rgba(34,197,94,0.05)', borderColor: 'rgba(34,197,94,0.22)' }}
-    >
-      {/* Top row: avatar + save-note */}
-      <div className="flex items-center gap-2 mb-2.5">
-        {photoURL
-          ? <img src={photoURL} alt="Your avatar" className="w-5 h-5 rounded-full flex-shrink-0 ring-1 ring-emerald-400/40" />
-          : <span className="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center text-[9px] font-bold text-emerald-400 flex-shrink-0">✓</span>
-        }
-        <p className="text-[11px] font-semibold text-emerald-400 truncate">
-          Quiz will be saved to your dashboard
-        </p>
-      </div>
-
-      {/* XP badge row */}
-      <div
-        className="rounded-lg px-2.5 py-2"
-        style={{ background: 'var(--color-canvas)', border: '1px solid var(--color-rim)' }}
-      >
-        <XpBadge stats={xpStats} />
-      </div>
-    </motion.div>
-  );
-}
 
