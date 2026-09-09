@@ -1,0 +1,115 @@
+COURSE: AI 402 - Applied Machine Learning & AI Agents
+INSTRUCTOR: Prof. James Okonkwo
+SEMESTER: Fall 2026
+DEPARTMENT: Artificial Intelligence & Data Science
+
+========================================================
+COURSE OVERVIEW
+========================================================
+This advanced course bridges theoretical machine learning concepts with
+practical implementation of intelligent autonomous systems. Students will
+build production-grade ML pipelines, design and deploy AI agents using
+the AWS Strands Agents SDK, and apply responsible AI principles throughout.
+Emphasis is placed on agentic design patterns, tool-calling architectures,
+multi-turn dialogue systems, and evaluation of large language models.
+
+========================================================
+WEEK-BY-WEEK SCHEDULE
+========================================================
+
+WEEK 1: Machine Learning Foundations Review
+- Supervised vs. Unsupervised vs. Reinforcement Learning
+- Bias-variance tradeoff, overfitting, and regularization (L1/L2)
+- Cross-validation: k-fold, stratified, leave-one-out
+- Evaluation metrics: accuracy, precision, recall, F1, ROC-AUC, RMSE
+- Feature engineering: scaling, encoding, imputation, feature selection
+- Lab: Build a classification pipeline with scikit-learn
+
+WEEK 2: Deep Learning & Neural Architectures
+- Feedforward networks, backpropagation, and gradient descent variants (SGD, Adam, RMSProp)
+- Convolutional Neural Networks (CNNs): filters, pooling, receptive fields
+- Recurrent Neural Networks (RNNs), LSTMs, GRUs: sequence modeling
+- Residual connections (ResNets) and normalization techniques (BatchNorm, LayerNorm)
+- Transfer learning: fine-tuning pretrained models for downstream tasks
+- Lab: Image classifier using PyTorch with ResNet18 transfer learning
+
+WEEK 3 (UPCOMING): Large Language Models & Prompt Engineering
+- Transformer architecture: self-attention, multi-head attention, positional encoding
+- Pretraining objectives: masked language modeling (BERT), causal language modeling (GPT)
+- In-context learning: zero-shot, one-shot, few-shot prompting
+- Prompt engineering patterns: chain-of-thought (CoT), tree-of-thought (ToT), role prompting
+- Retrieval-Augmented Generation (RAG): embedding models, vector databases, chunk strategies
+- Evaluation of LLM outputs: BLEU, ROUGE, BERTScore, LLM-as-judge
+- Hallucination: root causes, mitigation strategies, and grounding techniques
+- Lab: Build a RAG pipeline using Amazon Bedrock + FAISS vector store
+
+WEEK 4: AI Agents & Tool-Calling Architectures
+- What makes an agent? Perception → Reasoning → Action loop
+- ReAct (Reason + Act) pattern: chain-of-thought with tool invocation
+- AWS Strands Agents SDK: Agent class, BedrockModel, @tool decorator
+- Designing effective tool schemas: parameter typing, docstrings, return contracts
+- Autonomous multi-step agentic loops vs. single-shot completions
+- Human-in-the-loop (HITL): when to pause, surface to human, and resume
+- Lab: Build an autonomous research agent using Strands SDK with 3 custom tools
+
+WEEK 5: Multi-Agent Systems & Orchestration
+- Orchestrator-subagent patterns: routing, delegation, and result aggregation
+- Parallel agent execution vs. sequential pipelines
+- Agent state management: session memory, conversation history, external stores
+- Amazon Bedrock AgentCore: managed memory, gateway, serverless runtime
+- Multi-agent communication protocols: message passing, shared tool registries
+- Conflict resolution and consensus in multi-agent systems
+- Lab: Orchestrate 3 specialized agents (planner, researcher, writer) using Strands SDK
+
+WEEK 6: Responsible AI & Safety
+- AI safety taxonomy: misuse, misalignment, emergent behavior
+- Bias in training data: measurement, mitigation, and audit frameworks
+- Prompt injection attacks: detection and defense patterns
+- Content moderation: Amazon Bedrock Guardrails, keyword filtering, classifier-based detection
+- Privacy in ML: differential privacy, federated learning, data minimization
+- Transparency and explainability: LIME, SHAP, attention visualization
+- EU AI Act and regulatory landscape overview
+
+WEEK 7: MLOps & Production AI Systems
+- ML lifecycle: data versioning (DVC), experiment tracking (MLflow, Weights & Biases)
+- Model registry, staging environments, and canary deployments
+- Continuous training pipelines: drift detection, retraining triggers
+- Amazon SageMaker Pipelines: steps, conditions, model approval workflows
+- A/B testing for ML models: traffic splitting, statistical significance
+- Cost optimization: quantization, distillation, batching inference requests
+- Lab: Deploy a model with a SageMaker Pipeline including drift monitoring
+
+WEEK 8: AI in Production — Observability & Evaluation
+- Logging agent trajectories: tool calls, reasoning traces, latencies
+- Evaluation frameworks: G-Eval, RAGAS, TruLens for agentic systems
+- Amazon CloudWatch integration with AI microservices
+- Red-teaming AI agents: adversarial prompting, jailbreak testing
+- Incident response for AI systems: rollback, fallback, and graceful degradation
+- Business KPIs for AI agents: task completion rate, latency SLOs, cost-per-call
+- Capstone project presentations: autonomous AI agent deployed on Amazon Bedrock AgentCore
+
+========================================================
+ASSESSMENT SCHEDULE
+========================================================
+- Weekly Quizzes (15%): Auto-generated by Quiz Arena AI Syllabus Agent every Monday
+- Lab Assignments (35%): Jupyter notebooks submitted via GitHub Classroom
+- Midterm Project — Week 4: Autonomous tool-calling agent demo (20%)
+- Research Paper Review — Week 6: 2-page critique of assigned NeurIPS paper (10%)
+- Capstone Project — Week 8: End-to-end deployed AI agent on AWS (20%)
+
+========================================================
+TOOLS & PLATFORMS
+========================================================
+- Python 3.11+, PyTorch 2.x, scikit-learn, HuggingFace Transformers
+- AWS (Amazon Bedrock, SageMaker, Lambda, S3, CloudWatch)
+- AWS Strands Agents SDK (strands-agents)
+- Docker & Docker Compose for local agent development
+- GitHub Actions for CI/CD pipelines
+
+========================================================
+PREREQUISITES
+========================================================
+- CS 301 Introduction to Machine Learning (grade B+ or above)
+- Proficiency in Python (NumPy, Pandas, Matplotlib)
+- Linear algebra and probability theory
+- Familiarity with REST APIs and JSON

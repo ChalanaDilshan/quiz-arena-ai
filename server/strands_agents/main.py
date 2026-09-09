@@ -281,16 +281,44 @@ Guidelines:
 """.strip()
 
 
-# In-memory session store: session_id → list of Strands message dicts
-# (For a production app, store this in Redis or a DB)
+# ---------------------------------------------------------------------------
+# Tutor Session Store — Local Dev / Docker Fallback
+# ---------------------------------------------------------------------------
+# In local development and Docker Compose mode, multi-turn conversation
+# history for Professor Q is kept in this in-process Python dict:
+#
+#   session_id (str) → list of Strands message dicts (role + content)
+#
+# PRODUCTION (Amazon Bedrock AgentCore):
+#   When deployed via `agentcore deploy` (see agentcore.yaml), this dict
+#   is NOT used. The AgentCore runtime automatically wires the Tutor agent
+#   to the managed "agentcore_memory" provider declared in agentcore.yaml:
+#
+#     memory:
+#       provider: agentcore_memory
+#       strategies: [semantic, summarization]
+#       session_ttl_seconds: 3600
+#       max_turns: 20
+#
+#   AgentCore Memory persists conversation turns, applies semantic recall,
+#   and injects relevant history into the agent context — no extra code
+#   required in main.py. The Strands SDK and AgentCore runtime handle
+#   memory injection transparently at the platform layer.
+#
+# For a self-hosted production deployment (non-AgentCore), replace this
+# dict with a Redis store using redis-py or an Amazon ElastiCache cluster.
+# ---------------------------------------------------------------------------
 _tutor_sessions: dict[str, list[dict]] = {}
 
 
 def build_tutor_agent(history: list[dict] | None = None) -> Agent:
+    # `messages=history` manually replays prior turns from _tutor_sessions
+    # so the agent maintains conversational context across HTTP requests.
+    # On AgentCore, the managed memory provider replaces this pattern —
+    # history is injected automatically by the runtime before each turn.
     return Agent(
         model=make_model(temperature=0.7),
         system_prompt=TUTOR_PROMPT,
-        # Pass prior conversation history so Strands maintains context
         messages=history or [],
     )
 

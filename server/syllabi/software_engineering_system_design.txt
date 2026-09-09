@@ -1,0 +1,143 @@
+COURSE: SE 215 - Software Engineering & System Design
+INSTRUCTOR: Prof. Priya Ramachandran
+SEMESTER: Fall 2026
+DEPARTMENT: Software Engineering
+
+========================================================
+COURSE OVERVIEW
+========================================================
+This course equips students with the principles and practices needed to
+design, build, and maintain large-scale software systems. Topics span the
+full engineering lifecycle: from requirements gathering and architecture
+decisions through to deployment, observability, and incident management.
+Students will apply industry-standard design patterns, distributed systems
+concepts, and API design best practices using real-world case studies.
+
+========================================================
+WEEK-BY-WEEK SCHEDULE
+========================================================
+
+WEEK 1: Software Engineering Principles
+- The software development lifecycle (SDLC): Waterfall, Agile, Scrum, Kanban
+- SOLID principles: Single Responsibility, Open/Closed, Liskov Substitution, Interface Segregation, Dependency Inversion
+- DRY, KISS, YAGNI: practical application
+- Technical debt: identification, quantification, and paydown strategies
+- Code review best practices and pair programming
+- Lab: Refactor a legacy codebase applying SOLID principles
+
+WEEK 2: Version Control & Collaborative Development
+- Git internals: directed acyclic graph, objects (blob, tree, commit, tag)
+- Branching strategies: Git Flow, GitHub Flow, trunk-based development
+- Merge vs. rebase vs. squash: when to use each
+- Pull request culture: review checklists, LGTM standards, CI gatekeeping
+- Semantic versioning (SemVer) and changelog management
+- Monorepo vs. polyrepo tradeoffs
+- Lab: Implement a Git branching strategy and resolve a three-way merge conflict
+
+WEEK 3 (UPCOMING): System Design & Distributed Architecture
+- Functional vs. non-functional requirements: scalability, reliability, availability, maintainability
+- CAP theorem: Consistency, Availability, Partition Tolerance — tradeoffs in distributed systems
+- Horizontal vs. vertical scaling; stateless vs. stateful services
+- Load balancers: round-robin, least connections, IP hash, health-check strategies
+- Caching strategies: cache-aside, write-through, write-back, TTL policies; Redis and CDNs
+- Database design: normalization (1NF–3NF), denormalization for performance, index strategies
+- SQL vs. NoSQL: ACID vs. BASE, relational vs. document vs. wide-column vs. graph
+- Sharding patterns: range-based, hash-based, directory-based; resharding challenges
+- Message queues and event streaming: synchronous vs. asynchronous communication
+- Apache Kafka: partitions, consumer groups, offset management, exactly-once semantics
+- Eventual consistency patterns: saga, outbox, CQRS (Command Query Responsibility Segregation)
+- Lab: Design a URL shortener system — estimate capacity, choose database, design API
+
+WEEK 4: API Design & Microservices
+- REST API design: resource naming, HTTP verbs, status codes, HATEOAS
+- GraphQL: schemas, queries, mutations, subscriptions — vs. REST tradeoffs
+- gRPC: Protocol Buffers, streaming RPCs, service discovery
+- API versioning strategies: URI path, query param, Accept header
+- Microservices patterns: strangler fig, anti-corruption layer, sidecar, service mesh
+- Service discovery: client-side (Ribbon) vs. server-side (AWS ALB + ECS)
+- Circuit breaker pattern: Hystrix, Resilience4j, exponential backoff + jitter
+- API gateways: rate limiting, authentication delegation, request transformation
+- Lab: Build a REST + WebSocket API with rate limiting and circuit breaker
+
+WEEK 5: Testing Strategies & Quality Assurance
+- Testing pyramid: unit → integration → contract → end-to-end
+- Test-driven development (TDD): red-green-refactor cycle
+- Behavior-driven development (BDD): Gherkin syntax, Given-When-Then
+- Mocking and stubbing: dependency injection, test doubles, spy objects
+- Property-based testing: invariants, generators, shrinking (Hypothesis)
+- Performance testing: load testing (k6, Locust), stress testing, soak testing
+- Security testing: OWASP Top 10, static analysis (SAST), dynamic analysis (DAST)
+- Lab: Write a full test suite for a REST API covering unit, integration, and contract tests
+
+WEEK 6: DevOps, CI/CD & Infrastructure as Code
+- DevOps culture: CALMS (Culture, Automation, Lean, Measurement, Sharing)
+- CI/CD pipeline stages: build, test, security scan, artifact publish, deploy, verify
+- GitHub Actions: workflow syntax, job dependencies, matrix builds, reusable workflows
+- Docker: multi-stage builds, layer caching, distroless images, image security scanning
+- Container orchestration: Kubernetes core concepts (Pod, Deployment, Service, Ingress, ConfigMap, Secret)
+- Helm charts: templating, values files, chart lifecycle hooks
+- Infrastructure as Code: AWS CloudFormation vs. Terraform — declarative provisioning
+- Blue-green deployments, canary releases, and feature flags
+- Lab: Build a full CI/CD pipeline on GitHub Actions deploying a containerized app to AWS ECS
+
+WEEK 7: Observability & Site Reliability Engineering
+- The three pillars of observability: logs, metrics, traces
+- Structured logging: JSON logs, correlation IDs, log levels, log aggregation (CloudWatch Logs)
+- Metrics: RED method (Rate, Errors, Duration), USE method (Utilization, Saturation, Errors)
+- Distributed tracing: OpenTelemetry, AWS X-Ray, trace context propagation
+- Alerting: symptom-based vs. cause-based alerts, alert fatigue, runbooks
+- SLIs, SLOs, SLAs, and error budgets: defining and measuring reliability
+- Incident management: on-call rotations, incident severity levels, post-mortems (blameless culture)
+- Lab: Instrument a microservice with OpenTelemetry and create CloudWatch dashboards and alarms
+
+WEEK 8: Security Engineering
+- Authentication: OAuth 2.0 authorization code flow, PKCE, JWT structure and validation
+- Authorization: RBAC vs. ABAC; policy engines (OPA, Cedar)
+- OWASP Top 10 deep dive: injection, broken access control, cryptographic failures
+- Zero-trust architecture: identity perimeter, mutual TLS, service accounts
+- Secrets management: AWS Secrets Manager, HashiCorp Vault, secret rotation
+- Supply chain security: SBOM, dependency scanning, signed container images (Cosign, Sigstore)
+- Penetration testing basics: reconnaissance, exploitation, reporting, remediation
+
+WEEK 9: Scalability Patterns & Performance Optimization
+- Profiling applications: CPU profiling, memory profiling, flamegraphs
+- Database performance: EXPLAIN plans, index types (B-tree, hash, GIN, BRIN), connection pooling
+- N+1 query problem: detection and resolution with batching and DataLoader
+- Asynchronous processing: task queues (Celery, AWS SQS), background jobs, deadlines
+- CDN and edge computing: cache hit ratios, cache invalidation strategies, Cloudflare Workers
+- Read replicas and write amplification in distributed databases
+
+WEEK 10: Capstone Project & Career Preparation
+- System design interview framework: clarify requirements → estimate scale → high-level design → deep dive → bottlenecks
+- Common system design problems: Twitter feed, Uber ride-matching, Netflix streaming, WhatsApp messaging
+- Resume and portfolio review: GitHub profile, technical writing, open source contributions
+- Mock system design interviews (peer-reviewed)
+- Industry guest lecture: Engineering at Scale (invited speaker)
+- Capstone presentations: each team demos their end-to-end system with architecture diagram, load test results, and observability dashboard
+
+========================================================
+ASSESSMENT SCHEDULE
+========================================================
+- Weekly Quizzes (15%): Auto-generated by Quiz Arena AI — covers prior week's content
+- Design Labs (30%): Architecture diagrams + implementation, submitted on GitHub
+- Midterm — Week 5 (20%): Written system design exam (60 minutes)
+- Code Review Assessment — Week 6 (10%): Peer code review with structured rubric
+- Capstone Project — Week 10 (25%): Team demo, 10 min presentation + Q&A
+
+========================================================
+TOOLS & TECHNOLOGIES
+========================================================
+- Languages: Python, TypeScript/Node.js, Go (optional)
+- Containers: Docker, Docker Compose, Kubernetes (Minikube locally)
+- Cloud: AWS (EC2, ECS, RDS, SQS, CloudWatch, CloudFormation)
+- CI/CD: GitHub Actions
+- Observability: OpenTelemetry, AWS X-Ray, CloudWatch
+- Testing: pytest, Jest, k6
+
+========================================================
+PREREQUISITES
+========================================================
+- CS 101 Introduction to Programming
+- CS 201 Data Structures & Algorithms (grade B or above)
+- Basic familiarity with HTTP and REST APIs
+- CS 150 Introduction to Databases (recommended)

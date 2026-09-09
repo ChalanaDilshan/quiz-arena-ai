@@ -13,11 +13,30 @@
 
 **A real-time, competitive quiz arena powered by five Strands Agents SDK agents orchestrated on Amazon Bedrock AgentCore.**
 
-*Built for the AWS & AI Agents Hackathon — where intelligent multi-agent systems handle live commentary, tutoring, clue generation, and automated syllabus compilation.*
+*Built for the **Agents for Humans Hackathon** — where intelligent multi-agent systems augment human educators and learners with autonomous syllabus scanning, live commentary, Socratic tutoring, and in-game cognitive clues.*
 
-[Features](#features) · [Visual Signature](#bespoke-visual-signature--accessibility) · [Architecture](#architecture) · [The Agents](#the-five-strands-agents) · [Bedrock AgentCore Deployment](#bedrock-agentcore-deployment) · [Automated Testing & CI/CD](#automated-testing--cicd-pipeline) · [Quick Start](#quick-start) · [Security](#security--adversarial-hardening) · [API Reference](#api-reference)
+[Features](#features) · [Why This Matters](#why-this-matters-agents-for-humans) · [Visual Signature](#bespoke-visual-signature--accessibility) · [Architecture](#architecture) · [The Agents](#the-five-strands-agents) · [Bedrock AgentCore Deployment](#bedrock-agentcore-deployment) · [Automated Testing & CI/CD](#automated-testing--cicd-pipeline) · [Quick Start](#quick-start) · [Security](#security--adversarial-hardening) · [API Reference](#api-reference)
 
 </div>
+
+---
+
+## Why This Matters (Agents for Humans)
+
+The theme of this hackathon is **Agents for Humans** — AI agents that augment, empower, and adapt to human needs rather than operating as opaque black boxes or replacing human judgment.
+
+### 1. Eliminating Teacher Burnout (< 2 Min vs. 3–5 Hours)
+A typical educator spends **3 to 5 hours every week** manually reviewing lecture notes, drafting multiple-choice questions, writing distractor explanations, and formatting quizzes. 
+- **Autonomous Multi-Tool Syllabus Agent**: Scans course syllabi and lecture transcripts, detects upcoming topics, cross-references existing quiz banks to eliminate duplication, and prepares high-quality quiz drafts.
+- **Human-in-the-Loop Safeguard**: Operating under strict ethical AI principles, the agent *never* deploys a quiz directly to students. It surfaces to the educator in the Admin Dashboard marked `pending_approval` — surfacing only when human pedagogical authority is required to review, tweak, or approve.
+
+### 2. Solving the "Silent Misconception" Gap for Students
+Traditional quiz platforms tell a student "Incorrect" and move on. The student rarely discovers *why* their mental model was flawed, causing misconceptions to compound.
+- **Professor Q (Socratic AI Tutor)**: Activates immediately post-game. Using persistent conversational memory, Professor Q engages the student in an encouraging, multi-turn Socratic dialogue to unpack the underlying concept rather than just providing the answer.
+- **Hint Master**: During live gameplay, students who feel stuck can invoke Hint Master, which analyzes question distractors and provides cognitive scaffolds without spoiling the solution.
+
+### 3. Accessible, Inclusive Gamification
+Education should be universally accessible. Rather than generic primary-colored buttons, Quiz Arena introduces **WCAG AAA dual-coded answer pads** pairing distinct geometric shapes (`⬢`, `◆`, `★`, `■`) with tailored color gradients and dual keyboard shortcuts (`1–4` / `A–D`), guaranteeing full accessibility for colorblind and keyboard-only learners.
 
 ---
 
@@ -27,6 +46,7 @@
 |---|---|
 | **5 Strands SDK Agents** | Commentator, Tutor, Syllabus Scanner, Hint Master, and Live Quiz Generator powered by **Amazon Bedrock** (`BedrockModel` with Claude 3.5 Sonnet & Nova Pro) |
 | **Amazon Bedrock AgentCore** | Deployment-ready on AWS Bedrock AgentCore with `agentcore.yaml`, managed memory, and container runtime specs |
+| **Agents for Humans Workflow** | Autonomous background agents that surface to human educators only when verification or approval is required |
 | **Bespoke Visual Signature** | Signature shape+color identity (Amethyst Hexagon, Cerulean Diamond, Terracotta Star, Emerald Square) breaking away from generic Kahoot primary colors with WCAG AAA contrast |
 | **Visual Progress Stepper** | Interactive upload flow (`1. Upload PDF → 2. Configure Quiz`) with drag-and-drop scale cues, 25MB limits, and AI expectation guidance |
 | **Admin Dashboard Power Tools** | Real-time search, 6-way sorting (`Date`, `Accuracy`, `Players`, `Questions`), clean titles (`cleanTitle`), 1-click game re-hosting, and semantic accuracy thresholds |
@@ -138,8 +158,8 @@ Guides students through misconceptions after a match, maintaining conversation h
 
 ### 3. Syllabus Agent — *Autonomous Agent with 4 Real Tools*
 Autonomously scans course syllabi, detects upcoming topics, avoids duplicates, and compiles quiz drafts.
-- **Strands Pattern**: Autonomous multi-step agentic loop with tools (`list_syllabus_files`, `read_syllabus_file`, `list_existing_quizzes`, `save_quiz_draft`).
-- **Human-in-the-Loop**: Generated drafts are marked `pending_approval` until approved via Admin Dashboard.
+- **Strands Pattern**: Autonomous multi-step agentic loop with 4 native tools (`list_syllabus_files`, `read_syllabus_file`, `list_existing_quizzes`, `save_quiz_draft`).
+- **Agents for Humans Human-in-the-Loop**: The agent runs autonomously in the background and surfaces to the educator *only when human pedagogical judgment is required* — leaving draft quizzes in `pending_approval` state until a teacher approves or edits them via the Admin Dashboard.
 - **Endpoint**: `POST /api/agent/trigger`
 
 ### 4. Hint Master Agent — *Subtle In-Game Clue Provider*

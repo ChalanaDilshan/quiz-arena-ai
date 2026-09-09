@@ -1,0 +1,113 @@
+COURSE: CLD 301 - AWS Cloud Fundamentals & Architecture
+INSTRUCTOR: Prof. Sarah Mitchell
+SEMESTER: Fall 2026
+DEPARTMENT: Computer Science & Cloud Engineering
+
+========================================================
+COURSE OVERVIEW
+========================================================
+This course introduces students to cloud computing principles using
+Amazon Web Services (AWS). Students will gain hands-on experience
+with core AWS services, architectural best practices, and the
+AWS Well-Architected Framework. By the end of the semester students
+will be able to design, deploy, and secure scalable cloud applications.
+
+========================================================
+WEEK-BY-WEEK SCHEDULE
+========================================================
+
+WEEK 1: Introduction to Cloud Computing
+- What is cloud computing? On-premises vs. cloud vs. hybrid
+- The six advantages of cloud computing (AWS model)
+- Cloud deployment models: Public, Private, Hybrid
+- Cloud service models: IaaS, PaaS, SaaS
+- AWS Global Infrastructure: Regions, Availability Zones, Edge Locations
+- Lab: Create an AWS Free Tier account and explore the console
+
+WEEK 2: AWS Identity & Access Management (IAM)
+- IAM Users, Groups, Roles, and Policies
+- Principle of least privilege
+- IAM Policy JSON structure: Effect, Action, Resource
+- Multi-Factor Authentication (MFA) and password policies
+- AWS Organizations and Service Control Policies (SCPs)
+- Lab: Create IAM roles and attach policies; simulate policy evaluation
+
+WEEK 3 (UPCOMING): Amazon EC2 & Elastic Load Balancing
+- EC2 instance types and families (General Purpose, Compute Optimized, Memory Optimized, Storage Optimized)
+- Amazon Machine Images (AMIs): public, private, marketplace
+- EC2 pricing models: On-Demand, Reserved Instances, Spot Instances, Savings Plans
+- Security Groups vs. Network ACLs: stateful vs. stateless filtering
+- Elastic Load Balancing: Application Load Balancer (ALB), Network Load Balancer (NLB), Gateway Load Balancer
+- Auto Scaling Groups: launch templates, scaling policies, cooldown periods
+- EC2 User Data scripts for automated instance bootstrapping
+- Lab: Launch a web server on EC2 behind an ALB with Auto Scaling
+
+WEEK 4: Amazon S3 & Storage Services
+- S3 buckets, objects, keys, and storage classes (Standard, IA, Glacier, Intelligent-Tiering)
+- S3 versioning, lifecycle policies, and cross-region replication
+- S3 bucket policies vs. ACLs vs. pre-signed URLs
+- Amazon EBS volume types: gp3, io2, st1, sc1
+- Amazon EFS: shared file system for EC2
+- AWS Storage Gateway and Snow Family (Snowball, Snowmobile)
+
+WEEK 5: Amazon VPC & Networking
+- VPC components: subnets, route tables, internet gateways, NAT gateways
+- Public vs. private subnets; bastion host pattern
+- VPC Peering, AWS Transit Gateway, and VPC Endpoints
+- AWS Direct Connect vs. Site-to-Site VPN
+- Amazon Route 53: routing policies (simple, weighted, latency, failover, geolocation)
+- CloudFront distributions, origins, cache behaviors, and signed URLs
+
+WEEK 6: AWS Databases
+- Amazon RDS: Multi-AZ, Read Replicas, automated backups
+- Amazon Aurora: global databases, serverless v2, parallel query
+- Amazon DynamoDB: partition keys, sort keys, global secondary indexes, DynamoDB Streams
+- ElastiCache: Redis vs. Memcached use cases
+- Amazon Redshift: columnar storage, distribution keys, AQUA
+
+WEEK 7: Serverless Architecture & AWS Lambda
+- Event-driven architecture patterns
+- AWS Lambda: invocation models (sync, async, event-source mapping)
+- Lambda layers, versions, aliases, and environment variables
+- Amazon API Gateway: REST, HTTP, and WebSocket APIs
+- AWS Step Functions: Standard vs. Express workflows, state machine patterns
+- Amazon EventBridge rules and event buses
+
+WEEK 8: AWS AI/ML Services
+- Amazon Bedrock: foundation models, model invocation, guardrails
+- Amazon SageMaker: training jobs, inference endpoints, pipelines
+- AWS Strands Agents SDK: building autonomous agents with tool-calling
+- Amazon Rekognition, Textract, Comprehend, Translate overviews
+- Amazon Personalize and Forecast use cases
+
+WEEK 9: Security, Compliance & Monitoring
+- AWS Shared Responsibility Model
+- AWS Shield Standard vs. Shield Advanced (DDoS protection)
+- AWS WAF: web ACLs, managed rule groups, rate-limiting
+- AWS KMS: customer managed keys (CMKs), key policies, envelope encryption
+- Amazon GuardDuty, AWS Inspector, AWS Security Hub
+- AWS CloudTrail, Amazon CloudWatch Logs and Metrics, AWS Config
+
+WEEK 10: Cost Management & Well-Architected Framework
+- AWS Pricing Calculator and Cost Explorer
+- AWS Budgets and Cost Anomaly Detection
+- The six pillars of the Well-Architected Framework:
+  Operational Excellence, Security, Reliability, Performance Efficiency, Cost Optimization, Sustainability
+- AWS Trusted Advisor recommendations
+- Exam review and practice questions for AWS Solutions Architect Associate
+
+========================================================
+ASSESSMENT SCHEDULE
+========================================================
+- Weekly Quizzes (20%): Automated via Quiz Arena AI every Friday
+- Lab Reports (30%): Submitted via LMS within 48 hours of lab session
+- Midterm Exam — Week 5 (20%)
+- Cloud Architecture Design Project — Week 8 (15%)
+- Final Exam — Week 11 (15%)
+
+========================================================
+PREREQUISITES
+========================================================
+- Basic understanding of networking (IP addressing, HTTP)
+- Familiarity with Linux command line
+- CS 101 Introduction to Programming or equivalent
