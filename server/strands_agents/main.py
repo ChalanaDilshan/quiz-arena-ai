@@ -49,16 +49,29 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 # The gateway sends X-Internal-Token on every request to this service.
 # Set INTERNAL_SECRET to the same value in both .env files.
 INTERNAL_SECRET = os.environ.get("INTERNAL_SECRET", "")
+AGENTCORE_ENVIRONMENT = os.environ.get("AGENTCORE_ENVIRONMENT", "production")
+
+if not INTERNAL_SECRET:
+    if AGENTCORE_ENVIRONMENT == "development":
+        import warnings
+        warnings.warn(
+            "INTERNAL_SECRET not set — internal auth is disabled (dev mode).",
+            stacklevel=2,
+        )
+    else:
+        raise RuntimeError(
+            "INTERNAL_SECRET must be set when AGENTCORE_ENVIRONMENT is not "
+            "'development'. Refusing to start."
+        )
 
 def verify_internal_token(x_internal_token: str = Header(default="")) -> None:
     """FastAPI dependency: rejects any request missing the correct internal secret."""
-    if not INTERNAL_SECRET:
-        # If no secret is configured (local dev without env), skip check but warn.
-        import warnings
-        warnings.warn("INTERNAL_SECRET not set — internal auth is disabled!", stacklevel=2)
-        return
-    if x_internal_token != INTERNAL_SECRET:
+    if INTERNAL_SECRET and x_internal_token != INTERNAL_SECRET:
         raise HTTPException(status_code=401, detail="Unauthorized: missing or invalid internal token")
+    if not INTERNAL_SECRET:
+        # Only reachable in development mode (startup check above allows this).
+        import warnings
+        warnings.warn("Internal auth check skipped — no INTERNAL_SECRET (dev mode).", stacklevel=2)
 
 AWS_S3_BUCKET_NAME = os.environ.get("AWS_S3_BUCKET_NAME")
 s3_client = boto3.client("s3") if AWS_S3_BUCKET_NAME else None
