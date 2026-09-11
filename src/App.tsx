@@ -135,6 +135,7 @@ function App() {
             }}
             uploadProgress={game.uploadProgress}
             error={game.error}
+            onBack={() => setShowLanding(true)}
           />
         );
       case 'LOBBY':

@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useMemo, type DragEvent, type ChangeEvent 
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Upload, Users, Zap, FileText, ArrowRight,
-  Sparkles, ChevronLeft, ChevronUp, ChevronDown, LogIn, BookOpen, Check,
+  Sparkles, ChevronLeft, ChevronUp, ChevronDown, LogIn, BookOpen, Check, ArrowLeft,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getSavedQuizzes, type SavedQuiz } from '../utils/quizHistory';
@@ -17,6 +17,7 @@ interface HomeViewProps {
   initialTab?: 'join' | 'host';
   initialPin?: string;
   onHostSavedQuiz?: (quiz: SavedQuiz) => void;
+  onBack?: () => void;
 }
 
 type Difficulty = 'Easy' | 'Medium' | 'Hard';
@@ -29,7 +30,7 @@ const DIFFICULTY_META: Record<Difficulty, { desc: string }> = {
 
 const MIN_Q = 3, MAX_Q = 20;
 
-export function HomeView({ onJoinGame, onHostGame, onHostSavedQuiz, uploadProgress, error, initialTab = 'join', initialPin }: HomeViewProps) {
+export function HomeView({ onJoinGame, onHostGame, onHostSavedQuiz, uploadProgress, error, initialTab = 'join', initialPin, onBack }: HomeViewProps) {
   const [activeTab, setActiveTab] = useState<'join' | 'host'>(initialTab);
   const [pin, setPin] = useState<string[]>(() => {
     if (initialPin && initialPin.length === 6) {
@@ -137,6 +138,24 @@ export function HomeView({ onJoinGame, onHostGame, onHostSavedQuiz, uploadProgre
 
   return (
     <div className="min-h-screen bg-canvas flex items-center justify-center p-4">
+
+      {/* ── Back to Home button (top-left) ─────────────────────────── */}
+      {onBack && (
+        <motion.button
+          initial={{ opacity: 0, x: -10 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.3 }}
+          whileHover={{ scale: 1.04 }}
+          whileTap={{ scale: 0.94 }}
+          onClick={onBack}
+          className="fixed top-4 left-4 z-50 flex items-center gap-1.5 btn-ghost text-xs !py-2 !px-3 font-semibold"
+          aria-label="Back to landing page"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          Home
+        </motion.button>
+      )}
+
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
