@@ -16,6 +16,7 @@ import { UserProfileCard } from './UserProfileCard';
 import { trackDailyLogin, type LoginData } from '../utils/userProfile';
 import type { Player, Question } from '../types';
 import { LegalModal, type LegalTab } from './LegalModal';
+import { QuizArenaLogo } from './QuizArenaLogo';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -731,9 +732,7 @@ export function AdminDashboard({ onBack, onRehost }: AdminDashboardProps) {
               <ArrowLeft className="w-4 h-4 text-smoke" />
             </button>
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-sienna flex items-center justify-center">
-                <Zap className="w-3.5 h-3.5 text-white fill-white" />
-              </div>
+              <QuizArenaLogo className="w-7 h-7 drop-shadow-sm" />
               <span className="font-extrabold text-sm tracking-tight text-alabaster">
                 Admin Dashboard
               </span>

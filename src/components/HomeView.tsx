@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import { getSavedQuizzes, type SavedQuiz } from '../utils/quizHistory';
 import { extractTextFromPdf } from '../utils/pdfExtractor';
 import { LegalModal, type LegalTab } from './LegalModal';
+import { QuizArenaLogo } from './QuizArenaLogo';
 
 interface HomeViewProps {
   onJoinGame: (pin: string, nickname: string) => void;
@@ -165,9 +166,7 @@ export function HomeView({ onJoinGame, onHostGame, onHostSavedQuiz, uploadProgre
         {/* Brand */}
         <div className="mb-9">
           <div className="flex items-center gap-2.5 mb-4">
-            <div className="w-8 h-8 rounded-lg bg-sienna flex items-center justify-center">
-              <Zap className="w-4.5 h-4.5 text-white" />
-            </div>
+            <QuizArenaLogo className="w-8 h-8 drop-shadow-[0_2px_8px_rgba(224,122,95,0.35)]" />
             <span className="text-lg font-extrabold tracking-tight text-alabaster">Quiz Arena</span>
           </div>
           <h1 className="text-2xl font-extrabold tracking-tight text-alabaster leading-tight">

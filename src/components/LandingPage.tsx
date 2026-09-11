@@ -10,6 +10,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { InteractiveHeroDemo } from './InteractiveHeroDemo';
 import { LegalModal, type LegalTab } from './LegalModal';
+import { QuizArenaLogo } from './QuizArenaLogo';
 
 interface LandingPageProps {
   onHost: () => void;
@@ -143,9 +144,7 @@ function Navbar({ onHost, onJoin, onOpenAdmin }: LandingPageProps) {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
         {/* Brand Logo */}
         <div className="flex items-center gap-3 flex-shrink-0 cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-sienna text-white shadow-md shadow-sienna/20">
-            <Zap className="w-5 h-5 fill-current" />
-          </div>
+          <QuizArenaLogo className="w-9 h-9 drop-shadow-[0_2px_10px_rgba(224,122,95,0.4)] transition-transform hover:scale-105" />
           <div>
             <span className="font-extrabold text-base tracking-tight text-alabaster">
               Quiz Arena
@@ -754,9 +753,7 @@ export function LandingPage({ onHost, onJoin, onOpenAdmin }: LandingPageProps) {
       <footer className="border-t border-rim py-8 px-4 sm:px-6 bg-canvas">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-sienna text-white">
-              <Zap className="w-4 h-4 fill-current" />
-            </div>
+            <QuizArenaLogo className="w-7 h-7 drop-shadow-sm" />
             <span className="font-extrabold text-sm text-alabaster">Quiz Arena</span>
           </div>
 

@@ -6,7 +6,7 @@ services:
     env_file:
       - ./server/.env
     environment:
-      - AGENTCORE_ENVIRONMENT=production
+      - AGENTCORE_ENVIRONMENT=development
     # NO ports: published here — strands is internal-only.
     # The gateway reaches it via Docker DNS: http://strands-service:8001
     # Exposing port 8001 to the host would allow unauthenticated public access
