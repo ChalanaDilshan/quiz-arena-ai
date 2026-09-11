@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Copy, Users, Play, Loader2, Check, QrCode, Link as LinkIcon, Sparkles, X, Edit2, Shield } from 'lucide-react';
+import { Copy, Users, Play, Loader2, Check, QrCode, Link as LinkIcon, Sparkles, X, Edit2, Shield, ArrowLeft } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import type { Player } from '../types';
 
@@ -12,9 +12,10 @@ interface LobbyViewProps {
   onStartGame: () => void;
   onKickPlayer?: (playerId: string) => void;
   onEditNickname?: (newNickname: string) => void;
+  onLeave?: () => void;
 }
 
-export function LobbyView({ roomPin, players, isHost, currentUserId, onStartGame, onKickPlayer, onEditNickname }: LobbyViewProps) {
+export function LobbyView({ roomPin, players, isHost, currentUserId, onStartGame, onKickPlayer, onEditNickname, onLeave }: LobbyViewProps) {
   const [copiedPin, setCopiedPin] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [showQrModal, setShowQrModal] = useState(false);
@@ -56,6 +57,24 @@ export function LobbyView({ roomPin, players, isHost, currentUserId, onStartGame
 
   return (
     <div className="min-h-screen bg-canvas flex items-center justify-center p-4 sm:p-6 relative">
+
+      {/* ── Leave Lobby Button (top-left) ───────────────────────── */}
+      {onLeave && (
+        <motion.button
+          initial={{ opacity: 0, x: -10 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.3 }}
+          whileHover={{ scale: 1.04 }}
+          whileTap={{ scale: 0.94 }}
+          onClick={onLeave}
+          className="fixed top-4 left-4 z-50 flex items-center gap-1.5 btn-ghost text-xs !py-2 !px-3 font-semibold"
+          aria-label="Leave lobby and return to home"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          {isHost ? 'Cancel & Exit' : 'Leave Lobby'}
+        </motion.button>
+      )}
+
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}

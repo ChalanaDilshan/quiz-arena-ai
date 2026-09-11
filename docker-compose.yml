@@ -18,7 +18,7 @@ services:
       context: ./server
       dockerfile: Dockerfile.gateway
     ports:
-      - "3001:3001"
+      - "5001:3001"
     depends_on:
       - strands-service
     env_file:
@@ -36,8 +36,8 @@ services:
       context: .
       dockerfile: Dockerfile.frontend
       args:
-        # For local testing, we point the frontend to the local machine's exposed port 3001
-        - VITE_API_URL=http://localhost:3001
+        # For local testing, we point the frontend to the local machine's exposed port 5001
+        - VITE_API_URL=http://localhost:5001
     ports:
       - "80:80"
     depends_on:

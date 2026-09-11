@@ -147,6 +147,7 @@ function App() {
             onStartGame={game.startGame}
             onKickPlayer={game.kickPlayer}
             onEditNickname={game.editNickname}
+            onLeave={() => { game.resetGame(); setShowLanding(false); }}
           />
         );
       case 'QUESTION':
