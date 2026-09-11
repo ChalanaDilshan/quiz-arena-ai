@@ -5,6 +5,8 @@ services:
       dockerfile: Dockerfile.strands
     env_file:
       - ./server/.env
+    environment:
+      - AGENTCORE_ENVIRONMENT=production
     # NO ports: published here — strands is internal-only.
     # The gateway reaches it via Docker DNS: http://strands-service:8001
     # Exposing port 8001 to the host would allow unauthenticated public access
