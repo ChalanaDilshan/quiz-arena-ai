@@ -6,16 +6,16 @@
 ![AWS Strands Agents SDK](https://img.shields.io/badge/Strands%20Agents%20SDK-AWS%20Native-orange?style=for-the-badge&logo=amazon-aws)
 ![Amazon Bedrock](https://img.shields.io/badge/Amazon%20Bedrock-Claude%203.5%20%2F%20Nova-232F3E?style=for-the-badge&logo=amazonaws)
 ![Bedrock AgentCore](https://img.shields.io/badge/Bedrock%20AgentCore-Serverless%20Runtime-blueviolet?style=for-the-badge&logo=amazon-aws)
-![Automated Tests](https://img.shields.io/badge/Tests-23%20Passing-brightgreen?style=for-the-badge&logo=githubactions)
+![Automated Tests](https://img.shields.io/badge/Tests-36%20Passing-brightgreen?style=for-the-badge&logo=githubactions)
 ![WCAG Accessibility](https://img.shields.io/badge/WCAG%20AAA-Dual%20Shapes-success?style=for-the-badge&logo=w3c)
 ![React](https://img.shields.io/badge/React%2018-Frontend-61DAFB?style=for-the-badge&logo=react)
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge&logo=docker)
 
 **A real-time, competitive quiz arena powered by five Strands Agents SDK agents orchestrated on Amazon Bedrock AgentCore.**
 
-*Built for the **Agents for Humans Hackathon** — where intelligent multi-agent systems augment human educators and learners with autonomous syllabus scanning, live commentary, Socratic tutoring, and in-game cognitive clues.*
+*Built for the **Agents for Humans Hackathon** — where intelligent multi-agent systems augment human educators and learners with autonomous syllabus scanning, live commentary, Socratic tutoring, in-game cognitive clues, and gamified mastery.*
 
-[Features](#features) · [Why This Matters](#why-this-matters-agents-for-humans) · [Visual Signature](#bespoke-visual-signature--accessibility) · [Architecture](#architecture) · [The Agents](#the-five-strands-agents) · [Bedrock AgentCore Deployment](#bedrock-agentcore-deployment) · [Automated Testing & CI/CD](#automated-testing--cicd-pipeline) · [Quick Start](#quick-start) · [Security](#security--adversarial-hardening) · [API Reference](#api-reference)
+[Features](#features) · [Why This Matters](#why-this-matters-agents-for-humans) · [Visual Signature](#bespoke-visual-signature--accessibility) · [Architecture](#architecture) · [The Agents](#the-five-strands-agents) · [Bedrock AgentCore Deployment](#bedrock-agentcore-deployment) · [Automated Testing & CI/CD](#automated-testing--cicd-pipeline) · [Quick Start](#quick-start) · [Docker Deployment](#docker-deployment) · [Security & Compliance](#security-compliance--adversarial-hardening) · [API Reference](#api-reference)
 
 </div>
 
@@ -35,8 +35,12 @@ Traditional quiz platforms tell a student "Incorrect" and move on. The student r
 - **Professor Q (Socratic AI Tutor)**: Activates immediately post-game. Using persistent conversational memory, Professor Q engages the student in an encouraging, multi-turn Socratic dialogue to unpack the underlying concept rather than just providing the answer.
 - **Hint Master**: During live gameplay, students who feel stuck can invoke Hint Master, which analyzes question distractors and provides cognitive scaffolds without spoiling the solution.
 
-### 3. Accessible, Inclusive Gamification
-Education should be universally accessible. Rather than generic primary-colored buttons, Quiz Arena introduces **WCAG AAA dual-coded answer pads** pairing distinct geometric shapes (`⬢`, `◆`, `★`, `■`) with tailored color gradients and dual keyboard shortcuts (`1–4` / `A–D`), guaranteeing full accessibility for colorblind and keyboard-only learners.
+### 3. Gamification with Meaningful Mastery
+- **XP Progression & Tier Badges**: Learners earn XP with accuracy, speed, and streak bonuses, progressing through 6 rank tiers (Novice, Apprentice, Adept, Expert, Master, Grandmaster) with visual achievement badges and persistent match histories.
+
+### 4. Accessible, Inclusive, and Safe by Design
+- **WCAG AAA dual-coded answer pads** pair distinct geometric shapes (`⬢`, `◆`, `★`, `■`) with tailored color gradients and dual keyboard shortcuts (`1–4` / `A–D`), guaranteeing full accessibility for colorblind and keyboard-only learners.
+- **Student Data Privacy**: Built-in FERPA & COPPA compliance protections with zero PII retention, client-side document processing, and transparent subprocessor disclosures.
 
 ---
 
@@ -48,6 +52,8 @@ Education should be universally accessible. Rather than generic primary-colored 
 | **Amazon Bedrock AgentCore** | Deployment-ready on AWS Bedrock AgentCore with `agentcore.yaml`, managed memory, and container runtime specs |
 | **Agents for Humans Workflow** | Autonomous background agents that surface to human educators only when verification or approval is required |
 | **Bespoke Visual Signature** | Signature shape+color identity (Amethyst Hexagon, Cerulean Diamond, Terracotta Star, Emerald Square) breaking away from generic Kahoot primary colors with WCAG AAA contrast |
+| **Client-Side PDF Parser** | In-browser PDF extraction powered by PDF.js worker with live page segmentation, word counters, and instant preview |
+| **Gamified Player Profiles** | XP calculation engine, 6 rank tiers, animated reward modals, accuracy tracking, and streak history |
 | **Visual Progress Stepper** | Interactive upload flow (`1. Upload PDF → 2. Configure Quiz`) with drag-and-drop scale cues, 25MB limits, and AI expectation guidance |
 | **Admin Dashboard Power Tools** | Real-time search, 6-way sorting (`Date`, `Accuracy`, `Players`, `Questions`), clean titles (`cleanTitle`), 1-click game re-hosting, and semantic accuracy thresholds |
 | **Real-time Multiplayer** | Low-latency WebSocket room registry via Socket.IO with state reconciliation and live leaderboard synchronization |
@@ -57,8 +63,8 @@ Education should be universally accessible. Rather than generic primary-colored 
 | **Autonomous Syllabus Agent** | Autonomous multi-tool loop that scans course documents, checks for duplicate topics, and generates quizzes |
 | **Live AI Quiz Generation** | Real-time curriculum generation from uploaded PDFs or custom course outlines via Strands agents |
 | **Host Session Resumption** | Cryptographic host-reconnection protocol preventing host lockouts upon page refresh |
-| **Enterprise Security** | Defense-in-depth architecture: internal shared secret (`X-Internal-Token`), regex path-traversal protection, and anti-cheat answer masking |
-| **Automated Testing & CI/CD** | 23 automated tests across frontend, API gateway, and Strands agents verified in a 4-job GitHub Actions CI pipeline |
+| **Enterprise Security & Privacy** | Defense-in-depth architecture: FERPA/COPPA compliance, internal shared secret (`X-Internal-Token`), CWE-1236 spreadsheet sanitization, and anti-cheat answer masking |
+| **Automated Testing & CI/CD** | 36 automated tests across frontend, API gateway, and Strands agents verified in a 4-job GitHub Actions CI pipeline |
 
 ---
 
@@ -94,8 +100,9 @@ Quiz Arena utilizes a decoupled, secure three-tier architecture that isolates th
 │              React 18 + Vite + Framer Motion + Socket.IO        │
 └───────────────────────────┬─────────────────────────────────────┘
                             │  HTTP REST + WebSocket
+                            │  (Port 3001 in Local Dev / Port 5001 in Docker)
 ┌───────────────────────────▼─────────────────────────────────────┐
-│              NODE.JS API GATEWAY  (port 3001)                   │
+│              NODE.JS API GATEWAY                                │
 │   Express · Socket.IO · Helmet · Rate Limiter · Firebase Auth   │
 │                                                                 │
 │  ┌──────────────────────────────────────────────────────────┐   │
@@ -199,28 +206,28 @@ Or deploy using the included automation scripts:
 
 ## Automated Testing & CI/CD Pipeline
 
-Quiz Arena is verified by **23 automated tests** across all 3 layers of the application, integrated into a multi-job GitHub Actions CI workflow ([`.github/workflows/ci.yml`](./.github/workflows/ci.yml)):
+Quiz Arena is verified by **36 automated tests** across all 3 layers of the application, integrated into a multi-job GitHub Actions CI workflow ([`.github/workflows/ci.yml`](./.github/workflows/ci.yml)):
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────┐
 │                       GITHUB ACTIONS CI PIPELINE                           │
 ├───────────────────┬───────────────────┬───────────────────┬────────────────┤
 │ 1. Frontend Job   │ 2. Gateway Job    │ 3. Strands Job    │ 4. Docker Job  │
-│ React 20 + Vite   │ Node.js 20        │ Python 3.11       │ Orchestration  │
-│ 8 Unit Tests Pass │ 6 Integ Tests Pass│ 9 Unit Tests Pass │ Config Valid   │
+│ React 22 + Vite   │ Node.js 20        │ Python 3.11       │ Orchestration  │
+│ 21 Unit Tests     │ 6 Integ Tests     │ 9 Unit Tests      │ Config Valid   │
 └───────────────────┴───────────────────┴───────────────────┴────────────────┘
 ```
 
 ### Running Tests Locally
 
-#### 1. Frontend & Analytics Test Suite (8 tests)
-Verifies dynamic hardest question accuracy, CWE-1236 CSV injection sanitization, score bonuses, shape accessibility, clean titles, and semantic thresholds:
+#### 1. Frontend, Analytics, Legal & Parser Suite (21 tests)
+Verifies hardest question analytics, CWE-1236 CSV injection sanitization, score bonuses, WCAG shapes, title stripping, semantic thresholds, FERPA/COPPA legal disclaimers, and PDF.js text extraction:
 ```bash
 npm test
 ```
 
 #### 2. Gateway Integration Test Suite (6 tests)
-Spawns the Node.js gateway on an isolated port, verifying the `/health` contract, host reconnection tokens, and room lifecycle:
+Spawns the Node.js gateway on an isolated port, verifying the `/health` contract, host reconnection tokens, room lifecycle, and anti-cheat answer masking:
 ```bash
 cd server
 npm test
@@ -264,6 +271,7 @@ INTERNAL_SECRET=your_32_char_random_hex_secret
 **`.env`** (root directory, copy from `.env.example`):
 ```env
 VITE_API_URL=http://localhost:3001
+ALLOWED_ORIGINS=http://localhost:5173,http://localhost:5174,http://localhost:3001,http://localhost:5001
 INTERNAL_SECRET=your_32_char_random_hex_secret
 ADMIN_EMAILS=your_admin_email@example.com
 ```
@@ -272,7 +280,7 @@ ADMIN_EMAILS=your_admin_email@example.com
 - Download your Firebase Admin SDK JSON from the Firebase console
 - Save it as `server/serviceAccountKey.json` (ensure it is never committed to source control)
 
-### 2. Start All Services
+### 2. Start All Services Locally
 
 #### Windows — One-Command Start
 ```powershell
@@ -313,21 +321,26 @@ npm run dev
 
 ## Docker Deployment
 
-Spin up all three services with a single command:
+Spin up all three services with Docker Compose:
 
 ```bash
-docker compose up --build
+docker compose up -d --build
 ```
 
-| Container | Port | Description |
-|---|---|---|
-| `strands-service` | `8001` | Python Strands AI agents microservice |
-| `gateway` | `3001` | Node.js Express API + WebSocket gateway |
-| `frontend` | `80` | React app served via Nginx |
+### Port Mapping Matrix
+
+| Container | Host Port | Internal Port | Description |
+|---|---|---|---|
+| `frontend` | `80` | `80` | Production React app served via Nginx |
+| `gateway` | `5001` | `3001` | Node.js Express API + Socket.IO (mapped to `5001` on host to prevent Windows Hyper-V NAT reserved port exclusions on 3001) |
+| `strands-service` | *Internal Only* | `8001` | Python Strands AI microservice (isolated from public host; reached via Docker DNS at `http://strands-service:8001`) |
+
+- **Frontend App**: Access at `http://localhost` (port 80)
+- **API Gateway Health**: Access at `http://localhost:5001/health`
 
 To rebuild after code changes:
 ```bash
-docker compose up --build
+docker compose up -d --build
 ```
 
 To stop all services:
@@ -348,15 +361,19 @@ quiz-arena-ai/
 │   ├── components/
 │   │   ├── AdminDashboard.tsx    # Teacher dashboard with search, sort & quick actions
 │   │   ├── CommentatorWidget.tsx # Live AI commentary display
-│   │   ├── GameOverView.tsx      # Podium, stats & Professor Q tutor
+│   │   ├── ErrorBoundary.tsx     # Graceful crash handling and recovery UI
+│   │   ├── GameOverView.tsx      # Podium, stats, XP earnings & Professor Q tutor
 │   │   ├── HintBubble.tsx        # Hint Master UI (animated)
 │   │   ├── HomeView.tsx          # Upload stepper, dropzone cues & join screens
 │   │   ├── InteractiveHeroDemo.tsx # Interactive landing hero with signature pads
 │   │   ├── LandingPage.tsx       # Landing page with live hero demo
 │   │   ├── LeaderboardView.tsx   # Between-question live leaderboard
+│   │   ├── LegalModal.tsx        # FERPA/COPPA compliance, terms & privacy disclosures
 │   │   ├── LobbyView.tsx         # Pre-game room with QR code
 │   │   ├── QuestionView.tsx      # Bespoke visual signature pads & live hint
-│   │   └── TutorChat.tsx         # Post-game tutor chat interface
+│   │   ├── TutorChat.tsx         # Post-game tutor chat interface
+│   │   ├── UserProfileCard.tsx   # Gamified user stats, accuracy rates & match history
+│   │   └── XpBadge.tsx           # XP level badges (Novice → Grandmaster)
 │   ├── hooks/
 │   │   ├── useCommentator.ts     # Commentary polling hook
 │   │   └── useQuizGame.ts        # Core game state + hint logic
@@ -364,11 +381,16 @@ quiz-arena-ai/
 │   │   ├── AuthContext.tsx       # Firebase auth context
 │   │   └── ThemeContext.tsx      # Dark / light mode state
 │   └── utils/
+│       ├── pdfExtractor.ts       # Client-side PDF.js text extraction & page parsing
 │       ├── quizHistory.ts        # LocalStorage quiz record management
-│       └── sounds.ts             # Web Audio API sound synthesis
+│       ├── sounds.ts             # Web Audio API procedural sound synthesis
+│       ├── userProfile.ts        # Player stats, level-ups & persistent profile store
+│       └── xpLevels.ts           # XP calculations, rank tiers & streak bonuses
 │
 ├── tests/
-│   └── analytics.test.mjs        # 8 automated unit tests for scoring, shapes & titles
+│   ├── analytics.test.mjs        # 8 tests: hardest questions, CSV sanitization, scoring
+│   ├── legalModal.test.mjs       # 7 tests: FERPA/COPPA compliance, disclosures, modal
+│   └── pdfExtractor.test.mjs     # 6 tests: PDF.js extraction, page limits, word counts
 │
 ├── server/                       # Backend
 │   ├── strands_agents/
@@ -391,7 +413,8 @@ quiz-arena-ai/
 ├── infrastructure/               # Infrastructure-as-Code
 │   └── agentcore-stack.yaml      # CloudFormation template for Bedrock AgentCore
 ├── docs/
-│   └── BEDROCK_AGENTCORE_ARCHITECTURE.md # Full architectural specification
+│   ├── BEDROCK_AGENTCORE_ARCHITECTURE.md # Full architectural specification
+│   └── DEVPOST_SUBMISSION.md     # Hackathon submission text & demo package
 ├── Dockerfile.frontend           # Nginx-served React production build
 ├── docker-compose.yml            # Orchestrates all 3 containers
 ├── start.ps1                     # Windows one-command startup script
@@ -400,18 +423,20 @@ quiz-arena-ai/
 
 ---
 
-## Security & Adversarial Hardening
+## Security, Compliance & Adversarial Hardening
 
 | Mechanism | Implementation |
 |---|---|
+| **Student Data Privacy (FERPA & COPPA)** | Zero storage of student educational records (PII). In-memory processing only for quiz sessions; no training on student prompts |
 | **Internal Service Isolation** | Strands microservice does not expose any host ports in Docker; only accessible by gateway via internal Docker network DNS |
 | **Shared Secret Token Auth** | Outbound gateway requests include `X-Internal-Token` validated by FastAPI dependency before invoking any agent |
 | **Admin Route Access Control** | `/api/agent/*` protected with Firebase JWT authentication + verified against `ADMIN_EMAILS` allowlist |
 | **Defense-in-Depth Middleware** | Authentication checked prior to consuming rate-limiting quotas on sensitive routes |
 | **Rate Limiting** | 20 requests/minute per IP using `express-rate-limit` on all AI endpoints |
+| **CWE-1236 Formula Injection Sanitization** | CSV quiz analytics exports sanitize formula prefixes (`=`, `+`, `-`, `@`, `\t`, `\r`) to prevent spreadsheet exploitation |
 | **Path Traversal Hardening** | Quiz file operations enforce strict regex `^quiz_[a-f0-9]{8}_[a-zA-Z0-9_\-]{1,35}\.json$` in addition to `Path(name).name` |
-| **CORS Lockdown** | Strands service restricts CORS to explicitly configured frontend origins with no cookie credentials |
-| **Prompt Injection Defense** | Structural sanitizer strips control characters (`\x00-\x1F`) and injection chars (`<>"'\``) before passing data to agents |
+| **CORS Lockdown** | Express and Strands services restrict CORS to explicitly configured frontend origins with no cookie credentials |
+| **Prompt Injection Defense** | Structural sanitizer strips control characters (`\x00-\x1F`) and injection characters (`<>"'\``) before passing data to agents |
 | **Payload Size Limits** | Express restricts all JSON bodies to `10kb` to prevent Denial-of-Wallet attacks on the LLM API |
 | **Security Headers** | Full `Helmet.js` header suite (CSP, HSTS, X-Frame-Options, etc.) |
 | **Room Validation** | `requireValidRoom` middleware verifies every API call references a real, active game room |
@@ -483,14 +508,16 @@ quiz-arena-ai/
 | **API Gateway** | Node.js 20 · Express 5 · Socket.IO 4 | Real-time state synchronization, anti-cheat masking, rate limiting |
 | **Knowledge & Storage** | Amazon S3 & Local Fallback | Syllabi documents and quiz draft persistence (`AWS_S3_BUCKET_NAME`) |
 | **Frontend UI** | React 18 · TypeScript · Vite 8 · Framer Motion | Real-time podium, sound synthesis, QR join, dark/light themes |
+| **Gamification Engine** | Custom XP & Tier Algorithm | Leveling system, streak multipliers, dynamic rank badges |
 | **Authentication** | Firebase Admin SDK & Internal Token Guard | JWT admin authentication & `X-Internal-Token` microservice isolation |
+| **Compliance & Privacy** | FERPA & COPPA Architecture | Ephemeral data handling, transparent subprocessor notices |
 | **Infrastructure & CI/CD** | AWS CloudFormation · Docker Compose · GitHub Actions | Automated 4-job CI pipeline, containerized orchestrations |
 
 ---
 
 ## License
 
-[MIT License](./LICENSE) — © 2026 Chalana Dilshan
+[MIT License](./LICENSE) — © 2026 Quiz Arena AI 
 
 ---
 
