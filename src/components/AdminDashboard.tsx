@@ -1,11 +1,11 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Zap, ArrowLeft, LogOut, BarChart3, Users, Trophy,
   Target, Trash2, ChevronRight, Calendar, BookOpen,
   TrendingUp, AlertTriangle, CheckCircle2, Download,
   FileSpreadsheet, X, Award, Bot, Search, ArrowUpDown,
-  MoreVertical, ChevronDown, Play,
+  MoreVertical, ChevronDown, Play, AlertCircle, RotateCcw,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -607,29 +607,52 @@ export function AdminDashboard({ onBack, onRehost }: AdminDashboardProps) {
     });
   }, [records, searchQuery, sortBy]);
 
+  interface ErrorNotice {
+    message: string;
+    type?: 'error' | 'warning';
+    onRetry?: () => void;
+    retryLabel?: string;
+  }
+  const [errorNotice, setErrorNotice] = useState<ErrorNotice | null>(null);
   const [pendingQuiz, setPendingQuiz] = useState<Question[] | null>(null);
   const [isApproving, setIsApproving] = useState(false);
   const [isTriggering, setIsTriggering] = useState(false);
   const [legalModalOpen, setLegalModalOpen] = useState(false);
   const [legalTab, setLegalTab] = useState<LegalTab>('privacy');
 
-  useEffect(() => {
+  const fetchPendingQuiz = useCallback(async () => {
     if (!user) return;
-    user.getIdToken().then(token => {
-      fetch(`${import.meta.env.VITE_API_URL}/api/agent/pending`, {
+    setErrorNotice(null);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/agent/pending`, {
         headers: { 'Authorization': `Bearer ${token}` }
-      })
-        .then(res => res.json())
-        .then(data => {
-          if (data.pendingQuiz) setPendingQuiz(data.pendingQuiz);
-        })
-        .catch(console.error);
-    });
+      });
+      if (!res.ok) {
+        throw new Error(`Server returned HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      if (data.pendingQuiz) {
+        setPendingQuiz(data.pendingQuiz);
+      }
+    } catch (err) {
+      console.error('[AdminDashboard] Failed to fetch pending quiz:', err);
+      setErrorNotice({
+        message: "Couldn't load pending AI quizzes. Check backend connection.",
+        onRetry: () => fetchPendingQuiz(),
+        retryLabel: 'Retry',
+      });
+    }
   }, [user]);
 
-  const handleApproveQuiz = () => {
+  useEffect(() => {
+    fetchPendingQuiz();
+  }, [fetchPendingQuiz]);
+
+  const handleApproveQuiz = async () => {
     if (!user || !pendingQuiz) return;
     setIsApproving(true);
+    setErrorNotice(null);
     
     saveQuiz(user.uid, {
       id: `syllabus_${Date.now()}`,
@@ -637,54 +660,109 @@ export function AdminDashboard({ onBack, onRehost }: AdminDashboardProps) {
       dateSaved: new Date().toISOString(),
       questions: pendingQuiz,
     });
+    refreshRecords();
 
-    user.getIdToken().then(token => {
-      fetch(`${import.meta.env.VITE_API_URL}/api/agent/clear`, { 
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/agent/clear`, { 
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
-      })
-        .then(() => setPendingQuiz(null))
-        .catch(console.error)
-        .finally(() => setIsApproving(false));
-    });
+      });
+      if (!res.ok) {
+        throw new Error(`Server returned HTTP ${res.status}`);
+      }
+      setPendingQuiz(null);
+    } catch (err) {
+      console.error('[AdminDashboard] Failed to clear approved quiz:', err);
+      setErrorNotice({
+        message: "Quiz saved to history, but couldn't clear from pending server queue.",
+        type: 'warning',
+        onRetry: () => handleApproveQuiz(),
+        retryLabel: 'Retry clear',
+      });
+    } finally {
+      setIsApproving(false);
+    }
   };
 
   const handleDismissQuiz = async () => {
     if (!user) return;
-    const token = await user.getIdToken();
-    fetch(`${import.meta.env.VITE_API_URL}/api/agent/clear`, { 
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token}` }
-    })
-      .then(() => setPendingQuiz(null))
-      .catch(console.error);
+    setErrorNotice(null);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/agent/clear`, { 
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) {
+        throw new Error(`Server returned HTTP ${res.status}`);
+      }
+      setPendingQuiz(null);
+    } catch (err) {
+      console.error('[AdminDashboard] Failed to dismiss quiz:', err);
+      setErrorNotice({
+        message: "Failed to dismiss pending quiz on server. Please try again.",
+        onRetry: () => handleDismissQuiz(),
+        retryLabel: 'Retry',
+      });
+    }
   };
 
   const simulateBackgroundAgent = async () => {
     if (!user) return;
     setIsTriggering(true);
-    const token = await user.getIdToken();
-    fetch(`${import.meta.env.VITE_API_URL}/api/agent/trigger`, { 
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token}` }
-    })
-      .then(() => {
-        // Poll for the result after a few seconds
-        const interval = setInterval(() => {
-          fetch(`${import.meta.env.VITE_API_URL}/api/agent/pending`, {
+    setErrorNotice(null);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/agent/trigger`, { 
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) {
+        throw new Error(`Server returned HTTP ${res.status}`);
+      }
+
+      // Poll for the result with max 15 attempts (30 seconds safety timeout)
+      let attempts = 0;
+      const maxAttempts = 15;
+      const interval = setInterval(async () => {
+        attempts++;
+        try {
+          const pollRes = await fetch(`${import.meta.env.VITE_API_URL}/api/agent/pending`, {
             headers: { 'Authorization': `Bearer ${token}` }
-          })
-            .then(res => res.json())
-            .then(data => {
-              if (data.pendingQuiz) {
-                setPendingQuiz(data.pendingQuiz);
-                setIsTriggering(false);
-                clearInterval(interval);
-              }
-            });
-        }, 2000);
-      })
-      .catch(() => setIsTriggering(false));
+          });
+          if (pollRes.ok) {
+            const data = await pollRes.json();
+            if (data.pendingQuiz) {
+              setPendingQuiz(data.pendingQuiz);
+              setIsTriggering(false);
+              clearInterval(interval);
+              return;
+            }
+          }
+        } catch (pollErr) {
+          console.warn('[AdminDashboard] Polling check failed:', pollErr);
+        }
+
+        if (attempts >= maxAttempts) {
+          clearInterval(interval);
+          setIsTriggering(false);
+          setErrorNotice({
+            message: "AI agent task generation timed out. The agent may still be processing.",
+            onRetry: () => simulateBackgroundAgent(),
+            retryLabel: 'Try again',
+          });
+        }
+      }, 2000);
+    } catch (err) {
+      console.error('[AdminDashboard] Failed to trigger background agent:', err);
+      setIsTriggering(false);
+      setErrorNotice({
+        message: "Failed to trigger AI background agent. Check server status.",
+        onRetry: () => simulateBackgroundAgent(),
+        retryLabel: 'Retry',
+      });
+    }
   };
 
   const refreshRecords = () => {
@@ -810,6 +888,61 @@ export function AdminDashboard({ onBack, onRehost }: AdminDashboardProps) {
                   All quizzes you've hosted, with full student performance analytics.
                 </p>
               </div>
+
+              {/* Error / Warning Notice Banner */}
+              <AnimatePresence>
+                {errorNotice && (
+                  <motion.div
+                    role="alert"
+                    aria-live="polite"
+                    initial={{ opacity: 0, y: -10, height: 0 }}
+                    animate={{ opacity: 1, y: 0, height: 'auto' }}
+                    exit={{ opacity: 0, y: -10, height: 0 }}
+                    className="mb-6 overflow-hidden"
+                  >
+                    <div
+                      className={`rounded-xl p-4 flex items-center justify-between gap-3 border ${
+                        errorNotice.type === 'warning'
+                          ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                          : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <AlertCircle
+                          className={`w-5 h-5 flex-shrink-0 ${
+                            errorNotice.type === 'warning' ? 'text-amber-400' : 'text-rose-400'
+                          }`}
+                        />
+                        <p className="text-sm font-medium">{errorNotice.message}</p>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {errorNotice.onRetry && (
+                          <button
+                            onClick={errorNotice.onRetry}
+                            className={`btn-ghost !py-1 !px-2.5 text-xs font-semibold flex items-center gap-1.5 rounded-lg border ${
+                              errorNotice.type === 'warning'
+                                ? 'text-amber-200 hover:text-white hover:bg-amber-500/20 border-amber-500/30'
+                                : 'text-rose-200 hover:text-white hover:bg-rose-500/20 border-rose-500/30'
+                            }`}
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            {errorNotice.retryLabel || 'Retry'}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setErrorNotice(null)}
+                          className={`btn-ghost !p-1 hover:opacity-100 opacity-70 ${
+                            errorNotice.type === 'warning' ? 'text-amber-400' : 'text-rose-400'
+                          }`}
+                          aria-label="Dismiss notification"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {/* AI Agent Notification Card */}
               <AnimatePresence>

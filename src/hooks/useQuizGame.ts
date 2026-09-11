@@ -137,6 +137,39 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const hostTokenRef = useRef<string | null>(null);
+  const connectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const failTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearConnectionTimers = useCallback(() => {
+    if (connectTimerRef.current) {
+      clearTimeout(connectTimerRef.current);
+      connectTimerRef.current = null;
+    }
+    if (failTimerRef.current) {
+      clearTimeout(failTimerRef.current);
+      failTimerRef.current = null;
+    }
+  }, []);
+
+  const startConnectionTimers = useCallback(() => {
+    clearConnectionTimers();
+
+    // 5s warning if socket hasn't connected yet
+    connectTimerRef.current = setTimeout(() => {
+      if (socketRef.current && !socketRef.current.connected) {
+        setError('Still trying to connect to game server… check your internet connection or server status.');
+      }
+    }, 5000);
+
+    // 15s failure timeout
+    failTimerRef.current = setTimeout(() => {
+      if (socketRef.current && !socketRef.current.connected) {
+        setError('Unable to reach game server. Please verify the server is running and try again.');
+        socketRef.current?.disconnect();
+        socketRef.current = null;
+      }
+    }, 15000);
+  }, [clearConnectionTimers]);
 
   const saveHostSession = useCallback((data: StoredHostSession) => {
     try {
@@ -254,6 +287,7 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
 
   const resetGame = useCallback(() => {
     clearTimer();
+    clearConnectionTimers();
     clearHostSession();
     setGameState('HOME');
     setSession(null);
@@ -267,11 +301,24 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
     setHintLoading(false);
     socketRef.current?.disconnect();
     socketRef.current = null;
-  }, [clearTimer, clearHostSession]);
+  }, [clearTimer, clearConnectionTimers, clearHostSession]);
 
   // ── WebSocket message handler (live mode) ──────────────────────────────
 
   const setupSocketListeners = useCallback((socket: Socket, pin: string) => {
+    socket.on('connect', () => {
+      clearConnectionTimers();
+      setError(prev => (prev?.includes('trying to connect') || prev?.includes('Unable to reach') ? null : prev));
+    });
+
+    socket.on('connect_error', (err) => {
+      console.warn('[QuizGame] Socket connection error:', err.message);
+      // Ensure the timers are actively ticking toward timeout notifications
+      if (!connectTimerRef.current && !failTimerRef.current && !socket.connected) {
+        startConnectionTimers();
+      }
+    });
+
     socket.on('gameStateUpdate', (state) => {
       setGameState(state.state);
       setSession(prev => {
@@ -334,7 +381,7 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
       setError('You have been kicked by the host.');
       resetGame();
     });
-  }, [resetGame, saveHostSession, playerId]);
+  }, [resetGame, saveHostSession, playerId, clearConnectionTimers, startConnectionTimers]);
 
   // ── Actions ────────────────────────────────────────────────────────────
 
@@ -407,16 +454,18 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
         const socket = io(url);
         socketRef.current = socket;
         
+        startConnectionTimers();
+        setupSocketListeners(socket, pin);
+
         socket.on('connect', () => {
           socket.emit('joinGame', { pin, nickname, playerId });
         });
-        
-        setupSocketListeners(socket, pin);
       } catch {
+        clearConnectionTimers();
         setError('Could not connect to game server.');
       }
     },
-    [useMockMode, playerId, buildMockPlayers, setupSocketListeners],
+    [useMockMode, playerId, buildMockPlayers, setupSocketListeners, startConnectionTimers, clearConnectionTimers],
   );
 
   const hostGame = useCallback(
@@ -520,6 +569,7 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
           try {
             const socket = io(url);
             socketRef.current = socket;
+            startConnectionTimers();
             setupSocketListeners(socket, pin);
 
             socket.on('connect', () => {
@@ -535,17 +585,19 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
 
             setIsHost(true);
           } catch {
+            clearConnectionTimers();
             setError('Could not connect to live game server.');
           }
         })
         .catch((err) => {
           clearInterval(progressTimer);
+          clearConnectionTimers();
           setUploadProgress(0);
           setError('AI quiz generation failed. Check server connection.');
           console.error('[Strands] Live generation error:', err);
         });
     },
-    [useMockMode, playerId, buildMockPlayers, saveHostSession, setupSocketListeners],
+    [useMockMode, playerId, buildMockPlayers, saveHostSession, setupSocketListeners, startConnectionTimers, clearConnectionTimers],
   );
 
   const hostSavedQuiz = useCallback(
@@ -589,6 +641,7 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
         const socket = io(url);
         socketRef.current = socket;
         
+        startConnectionTimers();
         setupSocketListeners(socket, pin);
 
         socket.on('connect', () => {
@@ -597,10 +650,11 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
         
         setIsHost(true);
       } catch {
+        clearConnectionTimers();
         setError('Could not connect to game server.');
       }
     },
-    [playerId, buildMockPlayers, useMockMode, setupSocketListeners, saveHostSession],
+    [playerId, buildMockPlayers, useMockMode, setupSocketListeners, saveHostSession, startConnectionTimers, clearConnectionTimers],
   );
 
   const startGame = useCallback(() => {
@@ -780,6 +834,7 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
         const socket = io(url);
         socketRef.current = socket;
 
+        startConnectionTimers();
         setupSocketListeners(socket, stored.pin);
 
         socket.on('connect', () => {
@@ -797,17 +852,19 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
         });
       }
     } catch (e) {
+      clearConnectionTimers();
       console.warn('Failed to restore host session from sessionStorage:', e);
     }
-  }, [playerId, setupSocketListeners, clearHostSession]);
+  }, [playerId, setupSocketListeners, clearHostSession, startConnectionTimers, clearConnectionTimers]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       clearTimer();
+      clearConnectionTimers();
       socketRef.current?.disconnect();
     };
-  }, [clearTimer]);
+  }, [clearTimer, clearConnectionTimers]);
 
   // ── Public interface ───────────────────────────────────────────────────
 
