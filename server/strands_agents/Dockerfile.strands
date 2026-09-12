@@ -1,16 +1,54 @@
-FROM python:3.11-slim
+# =============================================================================
+# Stage 1: Build & Dependencies
+# =============================================================================
+FROM python:3.11-slim AS builder
+
+WORKDIR /build
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# Create virtual environment to isolate runtime dependencies
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# =============================================================================
+# Stage 2: Production Runner
+# =============================================================================
+FROM python:3.11-slim AS runner
 
 WORKDIR /app
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV PATH="/opt/venv/bin:$PATH"
 
-COPY . .
+# Create unprivileged system group and user
+RUN groupadd -r -g 1001 appgroup && \
+    useradd -r -u 1001 -g appgroup -s /sbin/nologin -d /app appuser
+
+# Copy virtual environment from builder stage
+COPY --from=builder /opt/venv /opt/venv
+
+# Copy application files
+COPY --chown=appuser:appgroup main.py ./
+
+# Create storage directories and set permissions for appuser
+RUN mkdir -p /app/syllabi /app/quizzes && \
+    chown -R appuser:appgroup /app
+
+USER appuser
 
 EXPOSE 8001
 
-# Bind to 0.0.0.0 inside the container so Docker's internal routing works.
-# Port 8001 is NOT published in docker-compose.yml, so it is unreachable
-# from the host or internet — only the gateway container can call it via
-# Docker DNS (http://strands-service:8001).
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001"]
+# Zero-dependency container health check using Python standard library
+HEALTHCHECK --interval=20s --timeout=5s --start-period=10s --retries=3 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health')" || exit 1
+
+# Production entrypoint with 2 workers for concurrent AI agent requests
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001", "--workers", "2"]
+

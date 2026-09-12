@@ -3,26 +3,40 @@ services:
     build:
       context: ./server/strands_agents
       dockerfile: Dockerfile.strands
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     env_file:
       - ./server/.env
     environment:
       - AGENTCORE_ENVIRONMENT=development
-    # NO ports: published here — strands is internal-only.
+    # NO ports published here — strands is internal-only.
     # The gateway reaches it via Docker DNS: http://strands-service:8001
     # Exposing port 8001 to the host would allow unauthenticated public access
-    # to all AI agent endpoints. Keep this block absent in production too.
+    # to all AI agent endpoints.
     volumes:
       - ./server/syllabi:/app/syllabi
       - ./server/quizzes:/app/quizzes
+    networks:
+      - quiz-arena-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   gateway:
     build:
       context: ./server
       dockerfile: Dockerfile.gateway
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     ports:
       - "5001:3001"
     depends_on:
-      - strands-service
+      strands-service:
+        condition: service_healthy
     env_file:
       - .env
     environment:
@@ -32,6 +46,13 @@ services:
       # NOTE: In production, replace this with a Docker secret or
       # FIREBASE_SERVICE_ACCOUNT_JSON env var to avoid mounting key files.
       - ./server/serviceAccountKey.json:/app/serviceAccountKey.json:ro
+    networks:
+      - quiz-arena-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   frontend:
     build:
@@ -40,7 +61,23 @@ services:
       args:
         # For local testing, we point the frontend to the local machine's exposed port 5001
         - VITE_API_URL=http://localhost:5001
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     ports:
       - "80:80"
     depends_on:
-      - gateway
+      gateway:
+        condition: service_healthy
+    networks:
+      - quiz-arena-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  quiz-arena-network:
+    driver: bridge
+

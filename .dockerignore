@@ -1,3 +1,17 @@
 node_modules
 dist
 .git
+.github
+.vscode
+.idea
+*.log
+.env*
+coverage
+.DS_Store
+README.md
+docs
+infrastructure
+tests
+server
+start.ps1
+start.sh
