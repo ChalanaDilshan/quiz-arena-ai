@@ -191,10 +191,17 @@ def generate_fallback_response(agent_type: str, ctx: dict) -> str:
     if agent_type == "tutor":
         q = ctx.get("question_text", "this question")
         ca = ctx.get("correct_answer", "the right answer")
+        fu = ctx.get("follow_up", "")
+        if fu:
+            return (
+                f"Regarding your follow-up ('{fu}'): When understanding why '{ca}' is correct for \"{q}\", "
+                f"focus on how it specifically provides the required mechanism or definition. "
+                f"Would you like me to walk through another practical example?"
+            )
         return (
-            f"Great attempt! The fundamental concept behind this is why '{ca}' is correct. "
-            f"In distributed and AI systems, this pattern guarantees predictable behavior and prevents unwanted side effects. "
-            f"Would you like to explore how this applies in real-world scenarios?"
+            f"Great attempt! The fundamental concept to understand here is why '{ca}' is the correct answer. "
+            f"It directly satisfies the core requirement defined in this question. "
+            f"Would you like to explore how this applies, or do you have any follow-up questions?"
         )
 
     if agent_type == "hint":
@@ -320,6 +327,7 @@ def build_commentator_agent() -> Agent:
     return Agent(
         model=make_model(temperature=0.85),
         system_prompt=COMMENTATOR_SYSTEM_PROMPT,
+        callback_handler=lambda **kw: None,
     )
 
 
@@ -389,6 +397,7 @@ def build_tutor_agent(history: list[dict] | None = None) -> Agent:
         model=make_model(temperature=0.7),
         system_prompt=TUTOR_PROMPT,
         messages=history or [],
+        callback_handler=lambda **kw: None,
     )
 
 
@@ -748,8 +757,16 @@ async def tutor(req: TutorRequest):
     agent = build_tutor_agent(history=history)
 
     if safe_fu:
-        # Follow-up turn
-        prompt = safe_fu
+        if not history:
+            prompt = (
+                f"We are discussing this quiz question:\n"
+                f"Question: {safe_q}\n"
+                f"Correct Answer: {safe_ca}\n\n"
+                f"Student follow-up question or comment: {safe_fu}\n"
+                f"Please answer the student's question helpfully, warmly, and concisely."
+            )
+        else:
+            prompt = safe_fu
     else:
         # First turn — introduce the wrong answer
         prompt = (
@@ -766,11 +783,12 @@ async def tutor(req: TutorRequest):
         agent,
         prompt,
         fallback_type="tutor",
-        context={"question_text": safe_q, "correct_answer": safe_ca}
+        context={"question_text": safe_q, "correct_answer": safe_ca, "follow_up": safe_fu}
     )
 
     # Persist updated conversation history for this session
-    _tutor_sessions[session_id] = agent.messages
+    if agent.messages:
+        _tutor_sessions[session_id] = agent.messages
 
     return {"explanation": str(result), "session_id": session_id}
 
@@ -788,7 +806,16 @@ async def tutor_stream(req: TutorRequest):
     agent      = build_tutor_agent(history=history)
 
     if safe_fu:
-        prompt = safe_fu
+        if not history:
+            prompt = (
+                f"We are discussing this quiz question:\n"
+                f"Question: {safe_q}\n"
+                f"Correct Answer: {safe_ca}\n\n"
+                f"Student follow-up question or comment: {safe_fu}\n"
+                f"Please answer the student's question helpfully, warmly, and concisely."
+            )
+        else:
+            prompt = safe_fu
     else:
         prompt = (
             'I just answered a quiz question wrong. Please read the <quiz_data> block '
@@ -811,16 +838,33 @@ async def tutor_stream(req: TutorRequest):
                         yield f"data: {json.dumps({'token': token})}\n\n"
             
             # Persist updated conversation history for this session
-            _tutor_sessions[session_id] = agent.messages
+            if agent.messages:
+                _tutor_sessions[session_id] = agent.messages
         except Exception as exc:
-            print(f"[Strands Tutor Stream] Stream note ({type(exc).__name__}): {exc}. Active streaming fallback engaged.")
+            print(f"[Strands Tutor Stream] Stream note ({type(exc).__name__}): {exc}. Engaging fallback recovery.")
             if not streamed_any:
-                fallback = generate_fallback_response("tutor", {"question_text": safe_q, "correct_answer": safe_ca})
-                words = fallback.split(" ")
-                for i, word in enumerate(words):
-                    chunk = word + (" " if i < len(words) - 1 else "")
-                    yield f"data: {json.dumps({'token': chunk})}\n\n"
-                    await asyncio.sleep(0.02)
+                try:
+                    sync_res = str(agent(prompt))
+                    if agent.messages:
+                        _tutor_sessions[session_id] = agent.messages
+                    words = sync_res.split(" ")
+                    for i, word in enumerate(words):
+                        chunk = word + (" " if i < len(words) - 1 else "")
+                        yield f"data: {json.dumps({'token': chunk})}\n\n"
+                        await asyncio.sleep(0.015)
+                    streamed_any = True
+                except Exception as sync_exc:
+                    print(f"[Strands Tutor Stream] Direct call notice ({type(sync_exc).__name__}): {sync_exc}.")
+                    fallback = generate_fallback_response("tutor", {
+                        "question_text": safe_q,
+                        "correct_answer": safe_ca,
+                        "follow_up": safe_fu
+                    })
+                    words = fallback.split(" ")
+                    for i, word in enumerate(words):
+                        chunk = word + (" " if i < len(words) - 1 else "")
+                        yield f"data: {json.dumps({'token': chunk})}\n\n"
+                        await asyncio.sleep(0.02)
         
         yield f"data: {json.dumps({'done': True, 'session_id': session_id})}\n\n"
 

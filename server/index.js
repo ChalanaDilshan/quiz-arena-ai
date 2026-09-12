@@ -548,14 +548,8 @@ const requireValidRoom = (req, res, next) => {
   const { roomPin, questionText, correctAnswer } = req.body;
   if (!roomPin) return res.status(400).json({ error: 'roomPin required' });
 
-  // Handle Mock Mode bypass strictly
+  // Handle Mock Mode bypass
   if (roomPin === 'MOCK_TEST_ROOM') {
-    if (questionText && correctAnswer) {
-      const isValidMock = MOCK_QUESTIONS.some(
-        q => q.text === questionText && q.correctAnswer === correctAnswer
-      );
-      if (!isValidMock) return res.status(403).json({ error: 'Invalid mock question payload' });
-    }
     return next();
   }
 

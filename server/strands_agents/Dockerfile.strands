@@ -25,6 +25,9 @@ WORKDIR /app
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV PYTHONIOENCODING=utf-8
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Create unprivileged system group and user (matching standard host/WSL2 non-root UID 1000)
@@ -49,6 +52,6 @@ EXPOSE 8001
 HEALTHCHECK --interval=20s --timeout=5s --start-period=10s --retries=3 \
   CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health')" || exit 1
 
-# Production entrypoint with 2 workers for concurrent AI agent requests
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001", "--workers", "2"]
+# Production entrypoint with 1 worker to preserve in-process tutor session memory
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001", "--workers", "1"]
 

@@ -461,7 +461,7 @@ export function GameOverView({ players, playerId, session, isHost, isMockMode, h
           {showTutor && hardestQuestion && (
             <TutorChat
               questionText={hardestQuestion.text}
-              playerAnswer={hardestQuestion.options[0]}
+              playerAnswer={hardestQuestion.options.find((_, idx) => idx !== hardestQuestion.correctIndex) || hardestQuestion.options[0]}
               correctAnswer={hardestQuestion.options[hardestQuestion.correctIndex]}
               roomPin={isMockMode ? 'MOCK_TEST_ROOM' : (session?.roomPin || 'MOCK_TEST_ROOM')}
               playerId={playerId}
