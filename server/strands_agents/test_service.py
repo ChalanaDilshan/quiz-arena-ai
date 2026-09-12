@@ -72,10 +72,13 @@ class TestStrandsSecurity(unittest.TestCase):
 class TestBedrockAndAgentIntegration(unittest.TestCase):
 
     def test_make_model_returns_bedrock_model(self):
-        model = make_model(temperature=0.7)
-        self.assertIsNotNone(model)
-        self.assertEqual(getattr(model, "config", {}).get("temperature"), 0.7)
-        self.assertEqual(model.client.meta.region_name, "us-east-1")
+        model1 = make_model(temperature=0.7)
+        model2 = make_model(temperature=0.7)
+        self.assertIsNotNone(model1)
+        self.assertEqual(getattr(model1, "config", {}).get("temperature"), 0.7)
+        self.assertEqual(model1.client.meta.region_name, "us-east-1")
+        # Verify model singleton / cache reuse (zero overhead on subsequent calls)
+        self.assertIs(model1, model2)
 
     def test_agents_build_successfully(self):
         c_agent = build_commentator_agent()

@@ -14,6 +14,7 @@ Agents:
 """
 
 import asyncio
+from functools import lru_cache
 import json
 import os
 import re
@@ -44,6 +45,10 @@ BEDROCK_MODEL_ID = os.environ.get(
     "anthropic.claude-3-5-sonnet-20241022-v2:0"
 )
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+
+# Singleton boto3 session initialized ONCE at startup to reuse credentials,
+# connection pools, and avoid IAM metadata resolution overhead on every request.
+BOTO_SESSION = boto3.Session(region_name=AWS_REGION)
 
 # ---------------------------------------------------------------------------
 # Internal shared secret — gates all AI endpoints from direct external calls
@@ -84,18 +89,18 @@ if not AWS_S3_BUCKET_NAME:
     SYLLABI_DIR.mkdir(exist_ok=True)
     QUIZZES_DIR.mkdir(exist_ok=True)
 
+@lru_cache(maxsize=16)
 def make_model(temperature: float = 0.7):
     """
-    Return a Strands Model instance.
-    Primary: Amazon Bedrock (BedrockModel) via AWS credentials & boto3.
-    Secondary: GeminiModel if GEMINI_API_KEY is configured.
-    Fallback: BedrockModel with default region/model.
+    Return a cached Strands Model instance.
+    Warm client connection pools, TCP keep-alive sockets, and IAM credentials are
+    reused across all requests via the singleton BOTO_SESSION and lru_cache.
     """
     try:
         return BedrockModel(
             model_id=BEDROCK_MODEL_ID,
-            region_name=AWS_REGION,
-            temperature=temperature
+            temperature=temperature,
+            boto_session=BOTO_SESSION,
         )
     except Exception as e:
         print(f"[Strands] BedrockModel init notice: {e}")
@@ -113,8 +118,8 @@ def make_model(temperature: float = 0.7):
 
     return BedrockModel(
         model_id=BEDROCK_MODEL_ID,
-        region_name=AWS_REGION,
-        temperature=temperature
+        temperature=temperature,
+        boto_session=BOTO_SESSION,
     )
 
 def generate_fallback_response(agent_type: str, ctx: dict) -> str:
