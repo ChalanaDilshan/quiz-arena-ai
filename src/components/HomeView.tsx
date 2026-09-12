@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useMemo, type DragEvent, type ChangeEvent 
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Upload, Users, Zap, FileText, ArrowRight,
-  Sparkles, ChevronLeft, ChevronUp, ChevronDown, LogIn, BookOpen, Check, ArrowLeft,
+  Sparkles, ChevronLeft, ChevronUp, ChevronDown, LogIn, BookOpen, Check, ArrowLeft, Loader2,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getSavedQuizzes, type SavedQuiz } from '../utils/quizHistory';
@@ -19,6 +19,7 @@ interface HomeViewProps {
   initialPin?: string;
   onHostSavedQuiz?: (quiz: SavedQuiz) => void;
   onBack?: () => void;
+  isJoining?: boolean;
 }
 
 type Difficulty = 'Easy' | 'Medium' | 'Hard';
@@ -31,7 +32,17 @@ const DIFFICULTY_META: Record<Difficulty, { desc: string }> = {
 
 const MIN_Q = 3, MAX_Q = 20;
 
-export function HomeView({ onJoinGame, onHostGame, onHostSavedQuiz, uploadProgress, error, initialTab = 'join', initialPin, onBack }: HomeViewProps) {
+export function HomeView({
+  onJoinGame,
+  onHostGame,
+  onHostSavedQuiz,
+  uploadProgress,
+  error,
+  initialTab = 'join',
+  initialPin,
+  onBack,
+  isJoining = false,
+}: HomeViewProps) {
   const [activeTab, setActiveTab] = useState<'join' | 'host'>(initialTab);
   const [pin, setPin] = useState<string[]>(() => {
     if (initialPin && initialPin.length === 6) {
@@ -81,6 +92,11 @@ export function HomeView({ onJoinGame, onHostGame, onHostSavedQuiz, uploadProgre
 
   const fullPin = pin.join('');
   const canJoin = fullPin.length === 6 && nickname.trim().length >= 2;
+
+  const handleJoin = () => {
+    if (!canJoin || isJoining) return;
+    onJoinGame(fullPin, nickname.trim());
+  };
 
   const [extractedText, setExtractedText] = useState<string>('');
   const [extractionStats, setExtractionStats] = useState<{ wordCount: number; numPages: number } | null>(null);
@@ -253,19 +269,28 @@ export function HomeView({ onJoinGame, onHostGame, onHostSavedQuiz, uploadProgre
                     type="text"
                     value={nickname}
                     onChange={e => setNickname(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && canJoin && onJoinGame(fullPin, nickname.trim())}
+                    onKeyDown={e => e.key === 'Enter' && handleJoin()}
                     placeholder="How should we call you?"
                     aria-label="Enter your player nickname"
                     maxLength={16}
                     className="input-field mb-5"
                   />
                   <button
-                    onClick={() => canJoin && onJoinGame(fullPin, nickname.trim())}
-                    disabled={!canJoin}
-                    aria-label="Join game with PIN and Nickname"
+                    onClick={handleJoin}
+                    disabled={!canJoin || isJoining}
+                    aria-label={isJoining ? 'Joining game…' : 'Join game with PIN and Nickname'}
                     className="btn-primary w-full"
                   >
-                    Join Game <ArrowRight className="w-4 h-4" />
+                    {isJoining ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Joining…
+                      </>
+                    ) : (
+                      <>
+                        Join Game <ArrowRight className="w-4 h-4" />
+                      </>
+                    )}
                   </button>
                 </motion.div>
 
