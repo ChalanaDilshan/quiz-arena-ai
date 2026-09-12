@@ -37,7 +37,16 @@ from strands.tools import tool
 # Bootstrap & Model Configuration: Amazon Bedrock (Primary)
 # ---------------------------------------------------------------------------
 
-load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env")
+# Resolve .env in local dev (server/.env), container environment (/app/.env), or current dir
+for _env_candidate in [
+    Path(__file__).parent.parent / ".env",
+    Path(__file__).parent / ".env",
+    Path("/app/.env"),
+]:
+    if _env_candidate.exists():
+        load_dotenv(dotenv_path=_env_candidate)
+        break
+
 
 AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
 BEDROCK_MODEL_ID = os.environ.get(
@@ -89,11 +98,32 @@ def verify_internal_token(x_internal_token: str = Header(default="")) -> None:
 AWS_S3_BUCKET_NAME = os.environ.get("AWS_S3_BUCKET_NAME")
 s3_client = boto3.client("s3") if AWS_S3_BUCKET_NAME else None
 
-SYLLABI_DIR  = Path(__file__).parent.parent / "syllabi"
-QUIZZES_DIR  = Path(__file__).parent.parent / "quizzes"
+# Resolve syllabus and quiz directories across local dev and Docker container environments
+if os.environ.get("SYLLABI_DIR"):
+    SYLLABI_DIR = Path(os.environ["SYLLABI_DIR"])
+elif Path("/app/syllabi").exists() or Path(__file__).parent.name == "app":
+    SYLLABI_DIR = Path("/app/syllabi")
+elif (Path(__file__).parent.parent / "syllabi").exists():
+    SYLLABI_DIR = Path(__file__).parent.parent / "syllabi"
+else:
+    SYLLABI_DIR = Path(__file__).parent / "syllabi"
+
+if os.environ.get("QUIZZES_DIR"):
+    QUIZZES_DIR = Path(os.environ["QUIZZES_DIR"])
+elif Path("/app/quizzes").exists() or Path(__file__).parent.name == "app":
+    QUIZZES_DIR = Path("/app/quizzes")
+elif (Path(__file__).parent.parent / "quizzes").exists():
+    QUIZZES_DIR = Path(__file__).parent.parent / "quizzes"
+else:
+    QUIZZES_DIR = Path(__file__).parent / "quizzes"
+
 if not AWS_S3_BUCKET_NAME:
-    SYLLABI_DIR.mkdir(exist_ok=True)
-    QUIZZES_DIR.mkdir(exist_ok=True)
+    try:
+        SYLLABI_DIR.mkdir(parents=True, exist_ok=True)
+        QUIZZES_DIR.mkdir(parents=True, exist_ok=True)
+    except Exception as e:
+        print(f"[Strands] Storage directory notice: {e}")
+
 
 @lru_cache(maxsize=16)
 def make_model(temperature: float = 0.7):

@@ -27,9 +27,9 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Create unprivileged system group and user
-RUN groupadd -r -g 1001 appgroup && \
-    useradd -r -u 1001 -g appgroup -s /sbin/nologin -d /app appuser
+# Create unprivileged system group and user (matching standard host/WSL2 non-root UID 1000)
+RUN groupadd -r -g 1000 appgroup && \
+    useradd -r -u 1000 -g appgroup -s /sbin/nologin -d /app appuser
 
 # Copy virtual environment from builder stage
 COPY --from=builder /opt/venv /opt/venv
