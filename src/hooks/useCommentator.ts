@@ -14,43 +14,72 @@ export function useCommentator() {
   });
 
   const triggerCommentary = useCallback(async (eventType: string, data: any, roomPin: string = 'MOCK_TEST_ROOM') => {
-    // Show typing indicator
-    setState((prev) => ({ ...prev, isVisible: true, isTyping: true, currentComment: null }));
+    // Show typing indicator immediately
+    setState({ isVisible: true, isTyping: true, currentComment: null });
+
+    let accumulated = '';
+    let autoHideTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleAutoHide = () => {
+      if (autoHideTimer) clearTimeout(autoHideTimer);
+      autoHideTimer = setTimeout(() => {
+        setState((prev) => ({ ...prev, isVisible: false }));
+      }, 8000);
+    };
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/commentary`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/commentary/stream`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ eventType, data, roomPin }),
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch commentary');
+      if (!response.ok || !response.body) {
+        throw new Error('Stream request failed');
       }
 
-      const result = await response.json();
-      
-      // Show actual comment
-      setState({
-        isVisible: true,
-        isTyping: false,
-        currentComment: result.comment,
-      });
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
 
-      // Auto-hide after 8 seconds
-      setTimeout(() => {
-        setState((prev) => ({ ...prev, isVisible: false }));
-      }, 8000);
+      // Show streaming comment immediately on first token
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
 
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          try {
+            const payload = JSON.parse(line.slice(6));
+
+            if (payload.token) {
+              accumulated += payload.token;
+              // On first token: clear the typing indicator and start showing text
+              setState({ isVisible: true, isTyping: false, currentComment: accumulated });
+            }
+
+            if (payload.done) {
+              scheduleAutoHide();
+            }
+          } catch {
+            // Malformed SSE line — skip
+          }
+        }
+      }
+
+      // If nothing streamed at all, hide
+      if (!accumulated) {
+        setState({ isVisible: false, isTyping: false, currentComment: null });
+      } else {
+        scheduleAutoHide();
+      }
     } catch (error) {
-      console.error('Commentator error:', error);
-      setState({
-        isVisible: false,
-        isTyping: false,
-        currentComment: null,
-      });
+      console.error('Commentator stream error:', error);
+      setState({ isVisible: false, isTyping: false, currentComment: null });
     }
   }, []);
 

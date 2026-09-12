@@ -643,6 +643,22 @@ app.post('/api/commentary', apiLimiter, requireValidRoom, async (req, res) => {
   }
 });
 
+// Streaming Commentary SSE (tokens stream in real-time — removes blocking wait)
+app.post('/api/commentary/stream', apiLimiter, requireValidRoom, async (req, res) => {
+  const { eventType, data } = req.body;
+  if (!eventType || typeof eventType !== 'string' || eventType.length > 50) {
+    return res.status(400).json({ error: 'Invalid or oversized eventType' });
+  }
+  if (data && JSON.stringify(data).length > 2000) {
+    return res.status(400).json({ error: 'Data payload too large' });
+  }
+  await proxyStrandsStream('/commentary/stream', {
+    event_type:  eventType,
+    player_name: data?.nickname ?? 'Unknown',
+    context:     data ? JSON.stringify(data) : '',
+  }, res);
+});
+
 // --- Autonomous Syllabus Agent (admin-only) ---
 // requireAgentAuth is placed FIRST so unauthenticated requests are rejected
 // before consuming any rate-limit budget (defence-in-depth ordering).
