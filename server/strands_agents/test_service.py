@@ -16,6 +16,7 @@ from main import (
     _QUIZ_FILENAME_RE,
     make_model,
     generate_fallback_response,
+    parse_quiz_json,
     build_commentator_agent,
     build_tutor_agent,
     build_hint_master_agent,
@@ -100,6 +101,37 @@ class TestBedrockAndAgentIntegration(unittest.TestCase):
             self.assertEqual(len(q["options"]), 4)
             self.assertIn("correctIndex", q)
             self.assertIn("timeLimit", q)
+
+    def test_fallback_quiz_grounded_in_topic(self):
+        topic = "CIS 22042 - Lab Sheet 03"
+        res = generate_fallback_response("quiz", {"topic": topic, "num_questions": 5})
+        questions = json.loads(res)
+        self.assertEqual(len(questions), 5)
+        raw_dump = json.dumps(questions)
+        # Ensure no fake AWS hackathon questions are present
+        self.assertNotIn("Amazon Bedrock AgentCore", raw_dump)
+        self.assertNotIn("AWS Snowball Edge", raw_dump)
+        self.assertNotIn("BedrockModel", raw_dump)
+        # Ensure the questions are grounded in the topic
+        self.assertIn(topic, questions[0]["text"])
+
+    def test_parse_quiz_json_resilience(self):
+        raw_markdown = """```json
+        [
+          {
+            "id": "q1",
+            "text": "What is virtual memory?",
+            "options": ["A mapping layer", "A CPU register", "A disk partition", "A cache line",],
+            "correctIndex": 0,
+            "timeLimit": 20,
+            "explanation": "Virtual memory maps virtual to physical addresses.",
+          },
+        ]
+        ```"""
+        parsed = parse_quiz_json(raw_markdown)
+        self.assertEqual(len(parsed), 1)
+        self.assertEqual(parsed[0]["text"], "What is virtual memory?")
+        self.assertEqual(len(parsed[0]["options"]), 4)
 
     def test_generate_quiz_endpoint(self):
         req = GenerateQuizRequest(

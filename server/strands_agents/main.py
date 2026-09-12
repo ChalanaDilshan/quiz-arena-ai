@@ -208,78 +208,130 @@ def generate_fallback_response(agent_type: str, ctx: dict) -> str:
         return "Think about the primary operational principle rather than temporary edge cases."
 
     if agent_type == "quiz":
-        topic = ctx.get("topic", "AWS & Cloud Architecture")
-        num_q = ctx.get("num_questions", 5)
-        pool = [
-            {
-                "id": "q1",
-                "text": f"What is a primary architectural principle when designing {topic}?",
-                "options": [
-                    "Decouple stateful services using managed messaging or memory",
-                    "Store all application state in server local memory",
-                    "Combine all database tables into a single unindexed file",
-                    "Bypass IAM authentication to reduce network hops"
+        topic = ctx.get("topic") or "General Knowledge"
+        num_q = max(1, min(ctx.get("num_questions", 5), 20))
+        templates = [
+            (
+                f"What is the foundational principle or primary objective associated with {topic}?",
+                [
+                    f"Understanding core concepts, methodologies, and standard conventions of {topic}",
+                    "Adopting unverified legacy procedures without validation",
+                    "Isolating operations without following established specifications",
+                    "Executing arbitrary instructions outside system constraints"
                 ],
-                "correctIndex": 0,
-                "timeLimit": 20,
-                "explanation": "Decoupling services and managing state via external stores ensures horizontal scalability and resilience."
-            },
-            {
-                "id": "q2",
-                "text": "What managed AWS platform provides serverless execution for Strands AI agents?",
-                "options": [
-                    "Amazon Bedrock AgentCore",
-                    "Amazon Route 53",
-                    "AWS Snowball Edge",
-                    "Amazon Elastic File System"
+                0,
+                f"Mastering core principles, methodologies, and standard conventions is essential for {topic}."
+            ),
+            (
+                f"When implementing solutions or analyzing concepts in {topic}, which methodology ensures maximum accuracy?",
+                [
+                    f"Following structured specifications and verifying results against expected outcomes",
+                    "Disregarding prerequisite requirements and boundary conditions",
+                    "Modifying arbitrary parameters without systematic diagnosis",
+                    "Assuming edge cases can be safely ignored without testing"
                 ],
-                "correctIndex": 0,
-                "timeLimit": 20,
-                "explanation": "Amazon Bedrock AgentCore provides managed serverless runtime, memory, and gateway infrastructure for AI agents."
-            },
-            {
-                "id": "q3",
-                "text": "In the Strands Agents SDK, which class configures foundation models hosted on AWS?",
-                "options": [
-                    "BedrockModel",
-                    "LocalTensorSession",
-                    "RawSocketStream",
-                    "VirtualHostManager"
+                0,
+                f"Structured methodologies and systematic verification against requirements ensure high accuracy in {topic}."
+            ),
+            (
+                f"In the context of {topic}, what is the recommended practice for diagnosing unexpected errors?",
+                [
+                    "Systematically analyzing diagnostic output, state transitions, and root causes",
+                    "Restarting processes repeatedly without inspecting error logs",
+                    "Suppressing all warning signals without further investigation",
+                    "Altering core configurations at random until symptoms change"
                 ],
-                "correctIndex": 0,
-                "timeLimit": 20,
-                "explanation": "BedrockModel connects Strands agents to models like Anthropic Claude and Amazon Nova via boto3."
-            },
-            {
-                "id": "q4",
-                "text": "How does AgentCore Memory support multi-turn agent conversations like tutoring?",
-                "options": [
-                    "Maintains short-term session context and semantic long-term memory",
-                    "Erases conversation memory after every prompt",
-                    "Stores unencrypted text in client-side cookies",
-                    "Requires re-training the base model for every question"
+                0,
+                f"Evidence-based analysis of logs and execution states is required to troubleshoot issues in {topic}."
+            ),
+            (
+                f"How should workflows and components be structured when developing projects involving {topic}?",
+                [
+                    "Modular components with clear separation of concerns and well-defined interfaces",
+                    "Tightly coupled monolithic blocks with unrestricted global state",
+                    "Undocumented dependencies without explicit version constraints",
+                    "Redundant execution pathways with conflicting sources of truth"
                 ],
-                "correctIndex": 0,
-                "timeLimit": 20,
-                "explanation": "AgentCore Memory provides semantic recall and summarization to maintain coherent multi-turn dialogue."
-            },
-            {
-                "id": "q5",
-                "text": "Why is strict input sanitization critical for agent tool interfaces?",
-                "options": [
-                    "To prevent prompt injection and path-traversal attacks",
-                    "To compress JSON payloads for faster download",
-                    "To bypass SSL certificate validation",
-                    "To force agents into single-threaded execution"
+                0,
+                f"Modular architecture with well-defined interfaces ensures maintainability and scalability in {topic}."
+            ),
+            (
+                f"What criterion is most critical when verifying the success of an implementation in {topic}?",
+                [
+                    "Meeting defined functional requirements, specifications, and correctness benchmarks",
+                    "Absence of immediate fatal crashes during initial startup only",
+                    "Subjective estimation without objective measurement or test coverage",
+                    "Evaluating performance against unrelated out-of-scope benchmarks"
                 ],
-                "correctIndex": 0,
-                "timeLimit": 20,
-                "explanation": "Sanitizing inputs passed to agent tools prevents malicious payloads from manipulating agent behavior or reading sensitive files."
-            }
+                0,
+                f"Verification against established functional requirements and benchmarks confirms success in {topic}."
+            ),
+            (
+                f"Which approach is most effective for maintaining security, integrity, and stability in {topic}?",
+                [
+                    "Enforcing strict input validation, least-privilege access, and automated testing",
+                    "Granting unrestricted permissions to avoid authorization overhead",
+                    "Hardcoding credentials and sensitive configuration directly into source code",
+                    "Bypassing validation layers to reduce initial latency"
+                ],
+                0,
+                f"Input validation, least privilege, and automated tests are foundational for system integrity in {topic}."
+            ),
         ]
+        pool = []
+        for i in range(num_q):
+            tpl = templates[i % len(templates)]
+            pool.append({
+                "id": f"q{i+1}",
+                "text": tpl[0] if i < len(templates) else f"In advanced {topic}, which standard practice is considered essential?",
+                "options": tpl[1],
+                "correctIndex": tpl[2],
+                "timeLimit": 25,
+                "explanation": tpl[3]
+            })
         return json.dumps(pool[:num_q])
 
     return "Operation completed by Strands Agent."
+
+def parse_quiz_json(raw: str) -> list[dict]:
+    """
+    Robustly parse JSON question arrays returned by LLM agents.
+    Handles markdown fences, trailing commas, whitespace, and individual question recovery.
+    """
+    if not raw or not isinstance(raw, str):
+        return []
+    cleaned = raw.strip()
+    # Strip markdown code fences (```json ... ``` or ``` ...)
+    cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned, flags=re.IGNORECASE | re.MULTILINE)
+    cleaned = re.sub(r"\s*```$", "", cleaned, flags=re.MULTILINE).strip()
+
+    # Find outermost array brackets [ ... ]
+    start = cleaned.find('[')
+    end = cleaned.rfind(']')
+    candidate = cleaned[start:end+1] if (start != -1 and end != -1 and end > start) else cleaned
+
+    # Strip trailing commas before closing braces and brackets
+    candidate_clean = re.sub(r',\s*([\]\}])', r'\1', candidate)
+
+    try:
+        data = json.loads(candidate_clean)
+        if isinstance(data, list) and len(data) > 0:
+            return data
+    except Exception:
+        pass
+
+    # Fallback: recover individual question JSON objects via regex
+    recovered = []
+    pattern = re.compile(r'\{[^{}]*"text"[^{}]*"options"[^{}]*\}', re.DOTALL)
+    for m in pattern.finditer(cleaned):
+        obj_str = re.sub(r',\s*([\]\}])', r'\1', m.group(0))
+        try:
+            obj = json.loads(obj_str)
+            if isinstance(obj, dict) and 'text' in obj and 'options' in obj:
+                recovered.append(obj)
+        except Exception:
+            continue
+    return recovered
 
 def safe_agent_call(agent: Agent, prompt: str, fallback_type: str = "general", context: dict | None = None) -> str:
     """Execute Strands Agent with robust error catching and contextual fallback."""
@@ -541,6 +593,7 @@ def build_syllabus_agent() -> Agent:
         model=make_model(temperature=0.2),
         system_prompt=SYLLABUS_PROMPT,
         tools=[list_syllabus_files, read_syllabus_file, list_existing_quizzes, save_quiz_draft],
+        callback_handler=lambda **kw: None,
     )
 
 
@@ -593,6 +646,7 @@ def build_hint_master_agent() -> Agent:
         model=make_fast_model(temperature=0.6),
         system_prompt=HINT_MASTER_PROMPT,
         tools=[analyze_question],
+        callback_handler=lambda **kw: None,
     )
 
 
@@ -609,7 +663,8 @@ Your absolute top priority is grounded factual accuracy:
 4. Provide 4 distinct options (A, B, C, D) where exactly 1 is unambiguously correct according to the context text, and the remaining 3 are plausible distractors.
 5. In the "explanation" field, explicitly cite or quote the part of the document that proves the correct answer.
 6. If no document content is provided, generate high-quality questions on the specified topic.
-Always output strictly a valid JSON array of question objects matching the schema:
+7. CRITICAL FORMAT RULE: Output strictly a valid raw JSON array starting with '[' and ending with ']'. No markdown fences (do not use ```json), no trailing commas, no conversational preamble.
+Schema:
 [
   {
     "id": "q1",
@@ -620,13 +675,13 @@ Always output strictly a valid JSON array of question objects matching the schem
     "explanation": "Explanation citing the text."
   }
 ]
-No markdown wrapping, no conversational preamble.
 """.strip()
 
 def build_quiz_generator_agent() -> Agent:
     return Agent(
         model=make_model(temperature=0.3),
         system_prompt=QUIZ_GENERATOR_PROMPT,
+        callback_handler=lambda **kw: None,
     )
 
 
@@ -1024,7 +1079,7 @@ async def hint(req: HintRequest):
 
 @app.post("/generate-quiz", dependencies=[Depends(verify_internal_token)])
 async def generate_quiz(req: GenerateQuizRequest):
-    safe_topic = sanitize(req.topic, 100) or "AWS & Cloud Fundamentals"
+    safe_topic = sanitize(req.topic, 100) or "General Knowledge"
     safe_diff = sanitize(req.difficulty, 30) or "Medium"
     safe_text = sanitize(req.syllabus_text, 50000)
     num_q = max(2, min(req.num_questions, 20))
@@ -1041,12 +1096,12 @@ async def generate_quiz(req: GenerateQuizRequest):
             f"3. Do NOT make up questions from general knowledge or outside of this document.\n"
             f"4. Provide exactly 4 options per question with exactly 1 correct option (0, 1, 2, or 3).\n"
             f"5. In the 'explanation' field, cite or quote the specific detail from the document that proves the answer.\n\n"
-            f"Output strictly a JSON array of {num_q} question objects matching the required schema."
+            f"CRITICAL FORMAT RULE: Output strictly a valid raw JSON array of {num_q} question objects starting with '[' and ending with ']'. No markdown code fences, no trailing commas, no conversational text."
         )
     else:
         prompt = (
             f"Generate {num_q} multiple-choice questions for topic '{safe_topic}' with difficulty '{safe_diff}'.\n"
-            f"Strictly output a JSON array of {num_q} question objects matching the required schema."
+            f"CRITICAL FORMAT RULE: Output strictly a valid raw JSON array of {num_q} question objects starting with '[' and ending with ']'. No markdown code fences, no trailing commas, no conversational text."
         )
 
     raw_res = safe_agent_call(
@@ -1056,14 +1111,8 @@ async def generate_quiz(req: GenerateQuizRequest):
         context={"topic": safe_topic, "num_questions": num_q}
     )
 
-    questions = []
-    try:
-        match = re.search(r'\[.*\]', raw_res, re.DOTALL)
-        if match:
-            questions = json.loads(match.group(0))
-        else:
-            questions = json.loads(raw_res)
-    except Exception:
+    questions = parse_quiz_json(raw_res)
+    if not questions:
         questions = json.loads(generate_fallback_response("quiz", {"topic": safe_topic, "num_questions": num_q}))
 
     validated = []
@@ -1088,7 +1137,7 @@ async def generate_quiz(req: GenerateQuizRequest):
 
 @app.post("/generate-quiz/stream", dependencies=[Depends(verify_internal_token)])
 async def generate_quiz_stream(req: GenerateQuizRequest):
-    safe_topic = sanitize(req.topic, 100) or "AWS & Cloud Fundamentals"
+    safe_topic = sanitize(req.topic, 100) or "General Knowledge"
     safe_diff = sanitize(req.difficulty, 30) or "Medium"
     safe_text = sanitize(req.syllabus_text, 50000)
     num_q = max(2, min(req.num_questions, 20))
@@ -1113,12 +1162,12 @@ async def generate_quiz_stream(req: GenerateQuizRequest):
                 f"3. Do NOT make up questions from general knowledge or outside of this document.\n"
                 f"4. Provide exactly 4 options per question with exactly 1 correct option (0, 1, 2, or 3).\n"
                 f"5. In the 'explanation' field, cite or quote the specific detail from the document that proves the answer.\n\n"
-                f"Output strictly a JSON array of {num_q} question objects matching the required schema."
+                f"CRITICAL FORMAT RULE: Output strictly a valid raw JSON array of {num_q} question objects starting with '[' and ending with ']'. No markdown code fences, no trailing commas, no conversational text."
             )
         else:
             prompt = (
                 f"Generate {num_q} multiple-choice questions for topic '{safe_topic}' with difficulty '{safe_diff}'.\n"
-                f"Strictly output a JSON array of {num_q} question objects matching the required schema."
+                f"CRITICAL FORMAT RULE: Output strictly a valid raw JSON array of {num_q} question objects starting with '[' and ending with ']'. No markdown code fences, no trailing commas, no conversational text."
             )
 
         raw_res = safe_agent_call(
@@ -1132,14 +1181,8 @@ async def generate_quiz_stream(req: GenerateQuizRequest):
         yield f"data: {json.dumps({'stage': 'VALIDATING', 'percent': 85, 'message': 'Validating question formats, time limits, and explanations…'})}\n\n"
         await asyncio.sleep(0.05)
 
-        questions = []
-        try:
-            match = re.search(r'\[.*\]', raw_res, re.DOTALL)
-            if match:
-                questions = json.loads(match.group(0))
-            else:
-                questions = json.loads(raw_res)
-        except Exception:
+        questions = parse_quiz_json(raw_res)
+        if not questions:
             questions = json.loads(generate_fallback_response("quiz", {"topic": safe_topic, "num_questions": num_q}))
 
         validated = []

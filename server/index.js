@@ -767,7 +767,7 @@ app.post('/api/generate-quiz', apiLimiter, async (req, res) => {
   try {
     const result = await callStrands('/generate-quiz', {
       syllabus_text: typeof syllabusText === 'string' ? syllabusText.slice(0, 50000) : '',
-      topic: typeof topic === 'string' ? topic.slice(0, 100) : 'AWS & Cloud Architecture',
+      topic: (typeof topic === 'string' && topic.trim()) ? topic.trim().slice(0, 100) : 'General Knowledge',
       num_questions: Number(numQuestions) || 5,
       difficulty: typeof difficulty === 'string' ? difficulty.slice(0, 30) : 'Medium',
     }, 60000); // 60 s — admin batch generation, users expect a wait
@@ -783,7 +783,7 @@ app.post('/api/generate-quiz/stream', apiLimiter, async (req, res) => {
 
   await proxyStrandsStream('/generate-quiz/stream', {
     syllabus_text: typeof syllabusText === 'string' ? syllabusText.slice(0, 50000) : '',
-    topic: typeof topic === 'string' ? topic.slice(0, 100) : 'AWS & Cloud Architecture',
+    topic: (typeof topic === 'string' && topic.trim()) ? topic.trim().slice(0, 100) : 'General Knowledge',
     num_questions: Number(numQuestions) || 5,
     difficulty: typeof difficulty === 'string' ? difficulty.slice(0, 30) : 'Medium',
   }, res, 60000); // 60 s to connect — batch quiz generation can be slow
