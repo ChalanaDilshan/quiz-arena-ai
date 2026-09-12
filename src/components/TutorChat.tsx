@@ -48,8 +48,12 @@ export function TutorChat({ questionText, playerAnswer, correctAnswer, roomPin, 
   const fetchExplanation = async (userInput: string | null) => {
     setIsLoading(true);
 
+    if (userInput) {
+      setMessages(prev => [...prev, { role: 'user' as const, text: userInput }]);
+    }
+
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/tutor/explain`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/tutor/stream`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -68,28 +72,83 @@ export function TutorChat({ questionText, playerAnswer, correctAnswer, roomPin, 
       if (res.status === 429) {
         setMessages(prev => [
           ...prev,
-          ...(userInput ? [{ role: 'user' as const, text: userInput }] : []),
           { role: 'model', text: "I'm currently helping too many students (API Rate Limit reached). Please give me 30 seconds to catch my breath and ask me again!" },
         ]);
+        setIsLoading(false);
         return;
       }
 
-      if (!res.ok) throw new Error('API Error');
+      if (!res.ok || !res.body) {
+        // Fallback to non-streaming endpoint if streaming is not supported
+        const fallbackRes = await fetch(`${import.meta.env.VITE_API_URL}/api/tutor/explain`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            roomPin,
+            playerId,
+            questionText,
+            playerAnswer,
+            correctAnswer,
+            sessionId,
+            followUp: userInput ?? '',
+          }),
+        });
 
-      const data = await res.json();
-      // Persist the Strands session ID for subsequent turns
-      if (data.sessionId) setSessionId(data.sessionId);
-      if (data.explanation) {
-        setMessages(prev => [
-          ...prev,
-          ...(userInput ? [{ role: 'user' as const, text: userInput }] : []),
-          { role: 'model', text: data.explanation },
-        ]);
+        if (!fallbackRes.ok) throw new Error('API Error');
+        const data = await fallbackRes.json();
+        if (data.sessionId) setSessionId(data.sessionId);
+        if (data.explanation) {
+          setMessages(prev => [...prev, { role: 'model', text: data.explanation }]);
+        }
+        setIsLoading(false);
+        return;
+      }
+
+      // Add placeholder model message for streaming tokens
+      setMessages(prev => [...prev, { role: 'model' as const, text: '' }]);
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed.startsWith('data: ')) {
+            try {
+              const payload = JSON.parse(trimmed.slice(6));
+              if (payload.session_id) {
+                setSessionId(payload.session_id);
+              }
+              if (payload.token) {
+                setMessages(prev => {
+                  const updated = [...prev];
+                  const last = updated[updated.length - 1];
+                  if (last && last.role === 'model') {
+                    return [
+                      ...updated.slice(0, -1),
+                      { ...last, text: last.text + payload.token }
+                    ];
+                  }
+                  return updated;
+                });
+              }
+            } catch (err) {
+              console.warn('[TutorChat] Stream chunk parse notice:', err);
+            }
+          }
+        }
       }
     } catch {
       setMessages(prev => [
         ...prev,
-        ...(userInput ? [{ role: 'user' as const, text: userInput }] : []),
         { role: 'model', text: "Sorry, I had trouble connecting. Please try again!" },
       ]);
     } finally {
@@ -208,12 +267,15 @@ export function TutorChat({ questionText, playerAnswer, correctAnswer, roomPin, 
                   }}
                 >
                   {msg.text}
+                  {isLoading && i === messages.length - 1 && msg.role === 'model' && (
+                    <span className="inline-block w-1.5 h-3 bg-sienna ml-0.5 animate-pulse align-middle rounded-sm" />
+                  )}
                 </div>
               </motion.div>
             ))}
 
-            {/* Typing indicator */}
-            {isLoading && (
+            {/* Typing indicator (only shown before the first streamed token arrives) */}
+            {isLoading && (messages.length === 0 || messages[messages.length - 1].text === '') && (
               <motion.div
                 key="typing"
                 initial={{ opacity: 0, y: 8 }}

@@ -13,6 +13,7 @@ Agents:
   4. HintMasterAgent   — gives a subtle, non-spoiler hint for a live question
 """
 
+import asyncio
 import json
 import os
 import re
@@ -25,6 +26,7 @@ import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from strands import Agent
 from strands.models import BedrockModel
@@ -683,6 +685,58 @@ async def tutor(req: TutorRequest):
     return {"explanation": str(result), "session_id": session_id}
 
 
+@app.post("/tutor/stream", dependencies=[Depends(verify_internal_token)])
+async def tutor_stream(req: TutorRequest):
+    safe_q  = sanitize(req.question_text, 500)
+    safe_pa = sanitize(req.player_answer, 200)
+    safe_ca = sanitize(req.correct_answer, 200)
+    safe_fu = sanitize(req.follow_up, 400)
+
+    # Retrieve or create session history
+    session_id = req.session_id or uuid.uuid4().hex
+    history    = _tutor_sessions.get(session_id, [])
+    agent      = build_tutor_agent(history=history)
+
+    if safe_fu:
+        prompt = safe_fu
+    else:
+        prompt = (
+            'I just answered a quiz question wrong. Please read the <quiz_data> block '
+            'to see the question and answers. Explain why my answer was wrong and help me understand.\n'
+            '<quiz_data>\n'
+            f'Question: {safe_q}\n'
+            f'My answer: {safe_pa}\n'
+            f'Correct answer: {safe_ca}\n'
+            '</quiz_data>'
+        )
+
+    async def stream_generator():
+        streamed_any = False
+        try:
+            async for event in agent.stream_async(prompt):
+                if isinstance(event, dict) and "data" in event:
+                    token = event["data"]
+                    if token:
+                        streamed_any = True
+                        yield f"data: {json.dumps({'token': token})}\n\n"
+            
+            # Persist updated conversation history for this session
+            _tutor_sessions[session_id] = agent.messages
+        except Exception as exc:
+            print(f"[Strands Tutor Stream] Stream note ({type(exc).__name__}): {exc}. Active streaming fallback engaged.")
+            if not streamed_any:
+                fallback = generate_fallback_response("tutor", {"question_text": safe_q, "correct_answer": safe_ca})
+                words = fallback.split(" ")
+                for i, word in enumerate(words):
+                    chunk = word + (" " if i < len(words) - 1 else "")
+                    yield f"data: {json.dumps({'token': chunk})}\n\n"
+                    await asyncio.sleep(0.02)
+        
+        yield f"data: {json.dumps({'done': True, 'session_id': session_id})}\n\n"
+
+    return StreamingResponse(stream_generator(), media_type="text/event-stream")
+
+
 @app.post("/syllabus/trigger", dependencies=[Depends(verify_internal_token)])
 async def syllabus_trigger(_: SyllabusRequest = SyllabusRequest()):
     agent = build_syllabus_agent()
@@ -882,6 +936,73 @@ async def generate_quiz(req: GenerateQuizRequest):
         "agent": "QuizGeneratorAgent (Strands Agents SDK)",
         "provider": "Amazon Bedrock"
     }
+
+
+@app.post("/generate-quiz/stream", dependencies=[Depends(verify_internal_token)])
+async def generate_quiz_stream(req: GenerateQuizRequest):
+    safe_topic = sanitize(req.topic, 100) or "AWS & Cloud Fundamentals"
+    safe_diff = sanitize(req.difficulty, 30) or "Medium"
+    safe_text = sanitize(req.syllabus_text, 10000)
+    num_q = max(2, min(req.num_questions, 20))
+
+    async def stream_generator():
+        # Stage 1: Parsing
+        yield f"data: {json.dumps({'stage': 'PARSING', 'percent': 25, 'message': f'Analyzing curriculum material for {safe_topic}…'})}\n\n"
+        await asyncio.sleep(0.05)
+
+        # Stage 2: Drafting
+        yield f"data: {json.dumps({'stage': 'DRAFTING', 'percent': 50, 'message': f'Synthesizing {num_q} {safe_diff} questions with distractors…'})}\n\n"
+
+        agent = build_quiz_generator_agent()
+        prompt = (
+            f"Generate {num_q} multiple-choice questions for topic '{safe_topic}' with difficulty '{safe_diff}'.\n"
+            f"Context material:\n{safe_text}\n\n"
+            f"Strictly output a JSON array of {num_q} question objects matching the required schema."
+        )
+        raw_res = safe_agent_call(
+            agent,
+            prompt,
+            fallback_type="quiz",
+            context={"topic": safe_topic, "num_questions": num_q}
+        )
+
+        # Stage 3: Validating
+        yield f"data: {json.dumps({'stage': 'VALIDATING', 'percent': 85, 'message': 'Validating question formats, time limits, and explanations…'})}\n\n"
+        await asyncio.sleep(0.05)
+
+        questions = []
+        try:
+            match = re.search(r'\[.*\]', raw_res, re.DOTALL)
+            if match:
+                questions = json.loads(match.group(0))
+            else:
+                questions = json.loads(raw_res)
+        except Exception:
+            questions = json.loads(generate_fallback_response("quiz", {"topic": safe_topic, "num_questions": num_q}))
+
+        validated = []
+        for i, q in enumerate(questions[:num_q]):
+            validated.append({
+                "id": f"q_{uuid.uuid4().hex[:6]}_{i+1}",
+                "text": str(q.get("text", f"Question {i+1} on {safe_topic}")),
+                "options": [str(opt) for opt in q.get("options", ["Option A", "Option B", "Option C", "Option D"])[:4]],
+                "correctIndex": int(q.get("correctIndex", 0)) % 4,
+                "timeLimit": int(q.get("timeLimit", 20)),
+                "explanation": str(q.get("explanation", "Verified based on course curriculum fundamentals."))
+            })
+
+        result_payload = {
+            "topic": safe_topic,
+            "difficulty": safe_diff,
+            "questions": validated,
+            "agent": "QuizGeneratorAgent (Strands Agents SDK)",
+            "provider": "Amazon Bedrock"
+        }
+
+        # Stage 4: Complete
+        yield f"data: {json.dumps({'stage': 'COMPLETE', 'percent': 100, 'result': result_payload})}\n\n"
+
+    return StreamingResponse(stream_generator(), media_type="text/event-stream")
 
 
 @app.get("/health")

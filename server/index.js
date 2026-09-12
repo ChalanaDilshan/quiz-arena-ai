@@ -580,6 +580,44 @@ async function getStrands(path) {
   return res.json();
 }
 
+async function proxyStrandsStream(path, body, clientRes) {
+  clientRes.setHeader('Content-Type', 'text/event-stream');
+  clientRes.setHeader('Cache-Control', 'no-cache, no-transform');
+  clientRes.setHeader('Connection', 'keep-alive');
+  clientRes.setHeader('X-Accel-Buffering', 'no');
+  clientRes.flushHeaders();
+
+  try {
+    const strandsRes = await fetch(`${STRANDS_URL}${path}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Internal-Token': INTERNAL_SECRET,
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!strandsRes.ok || !strandsRes.body) {
+      clientRes.write(`data: ${JSON.stringify({ error: 'Strands service stream failed' })}\n\n`);
+      return clientRes.end();
+    }
+
+    const reader = strandsRes.body.getReader();
+    const decoder = new TextDecoder();
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      clientRes.write(decoder.decode(value, { stream: true }));
+    }
+    clientRes.end();
+  } catch (err) {
+    console.error(`[Strands Stream Error ${path}]:`, err.message);
+    clientRes.write(`data: ${JSON.stringify({ error: 'Stream disconnected' })}\n\n`);
+    clientRes.end();
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Routes
 // ---------------------------------------------------------------------------
@@ -664,6 +702,18 @@ app.post('/api/generate-quiz', apiLimiter, async (req, res) => {
   }
 });
 
+// Streaming Progress & Quiz Generation SSE
+app.post('/api/generate-quiz/stream', apiLimiter, async (req, res) => {
+  const { syllabusText, topic, numQuestions, difficulty } = req.body ?? {};
+
+  await proxyStrandsStream('/generate-quiz/stream', {
+    syllabus_text: typeof syllabusText === 'string' ? syllabusText.slice(0, 10000) : '',
+    topic: typeof topic === 'string' ? topic.slice(0, 100) : 'AWS & Cloud Architecture',
+    num_questions: Number(numQuestions) || 5,
+    difficulty: typeof difficulty === 'string' ? difficulty.slice(0, 30) : 'Medium',
+  }, res);
+});
+
 // --- Post-game Tutor Agent ---
 app.post('/api/tutor/explain', apiLimiter, requireValidRoom, async (req, res) => {
   const { questionText, playerAnswer, correctAnswer, sessionId, followUp } = req.body;
@@ -685,6 +735,23 @@ app.post('/api/tutor/explain', apiLimiter, requireValidRoom, async (req, res) =>
     if (err.status === 429) return res.status(429).json({ error: 'Rate limit exceeded' });
     res.status(500).json({ error: 'Tutor agent failed to respond.' });
   }
+});
+
+// Streaming Post-game Tutor Agent SSE
+app.post('/api/tutor/stream', apiLimiter, requireValidRoom, async (req, res) => {
+  const { questionText, playerAnswer, correctAnswer, sessionId, followUp } = req.body;
+
+  if (!questionText || typeof questionText !== 'string' || questionText.length > 500 || !correctAnswer) {
+    return res.status(400).json({ error: 'Invalid or oversized question payload' });
+  }
+
+  await proxyStrandsStream('/tutor/stream', {
+    session_id:     sessionId ?? '',
+    question_text:  questionText,
+    player_answer:  playerAnswer ?? '',
+    correct_answer: correctAnswer,
+    follow_up:      followUp ?? '',
+  }, res);
 });
 
 // --- Hint Master Agent ---

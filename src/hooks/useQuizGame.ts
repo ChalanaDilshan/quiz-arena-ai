@@ -523,13 +523,8 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
         return;
       }
 
-      // Live mode: Request Strands Agents on Bedrock to compile quiz from syllabus
-      let progress = 15;
+      // Live mode: Request Strands Agents on Bedrock to compile quiz from syllabus with SSE streaming
       setUploadProgress(15);
-      const progressTimer = setInterval(() => {
-        progress = Math.min(progress + 15, 85);
-        setUploadProgress(progress);
-      }, 350);
 
       const url = import.meta.env.VITE_API_URL || 'http://localhost:3001';
       const topicName = _file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
@@ -545,57 +540,111 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
         }
       }
 
-      fetch(`${url}/api/generate-quiz`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          topic: topicName,
-          numQuestions,
-          difficulty,
-          syllabusText: syllabusContent || `Lecture Document: ${_file.name}. Generating ${numQuestions} ${difficulty} questions on ${topicName}.`
-        })
-      })
-        .then(async (res) => {
-          if (!res.ok) throw new Error('Generation failed');
-          return res.json();
-        })
-        .then((data) => {
-          clearInterval(progressTimer);
-          setUploadProgress(100);
+      const launchGame = (data: { topic?: string; questions: Question[] }) => {
+        setUploadProgress(100);
+        const generatedQuestions: Question[] = data.questions;
+        const pin = generatePin();
 
-          const generatedQuestions: Question[] = data.questions;
-          const pin = generatePin();
+        try {
+          const socket = io(url);
+          socketRef.current = socket;
+          startConnectionTimers();
+          setupSocketListeners(socket, pin);
 
-          try {
-            const socket = io(url);
-            socketRef.current = socket;
-            startConnectionTimers();
-            setupSocketListeners(socket, pin);
-
-            socket.on('connect', () => {
-              socket.emit('hostGame', {
-                pin,
-                quizData: {
-                  topic: data.topic || topicName,
-                  questions: generatedQuestions,
-                },
-                hostId: playerId,
-              });
+          socket.on('connect', () => {
+            socket.emit('hostGame', {
+              pin,
+              quizData: {
+                topic: data.topic || topicName,
+                questions: generatedQuestions,
+              },
+              hostId: playerId,
             });
+          });
 
-            setIsHost(true);
-          } catch {
-            clearConnectionTimers();
-            setError('Could not connect to live game server.');
-          }
-        })
-        .catch((err) => {
-          clearInterval(progressTimer);
+          setIsHost(true);
+        } catch {
           clearConnectionTimers();
-          setUploadProgress(0);
-          setError('AI quiz generation failed. Check server connection.');
-          console.error('[Strands] Live generation error:', err);
-        });
+          setError('Could not connect to live game server.');
+        }
+      };
+
+      const generateStreaming = async () => {
+        try {
+          const res = await fetch(`${url}/api/generate-quiz/stream`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              topic: topicName,
+              numQuestions,
+              difficulty,
+              syllabusText: syllabusContent || `Lecture Document: ${_file.name}. Generating ${numQuestions} ${difficulty} questions on ${topicName}.`
+            })
+          });
+
+          if (!res.ok || !res.body) {
+            throw new Error('Streaming not available, falling back');
+          }
+
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder('utf-8');
+          let buffer = '';
+          let quizCompleted = false;
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (trimmed.startsWith('data: ')) {
+                try {
+                  const payload = JSON.parse(trimmed.slice(6));
+                  if (typeof payload.percent === 'number') {
+                    setUploadProgress(payload.percent);
+                  }
+                  if (payload.stage === 'COMPLETE' && payload.result) {
+                    quizCompleted = true;
+                    launchGame(payload.result);
+                  }
+                } catch (e) {
+                  console.warn('[useQuizGame] Parse chunk notice:', e);
+                }
+              }
+            }
+          }
+
+          if (!quizCompleted) {
+            throw new Error('Incomplete quiz generation stream');
+          }
+        } catch (streamErr) {
+          console.warn('[useQuizGame] Streaming quiz notice, trying standard endpoint:', streamErr);
+          const fallbackRes = await fetch(`${url}/api/generate-quiz`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              topic: topicName,
+              numQuestions,
+              difficulty,
+              syllabusText: syllabusContent || `Lecture Document: ${_file.name}. Generating ${numQuestions} ${difficulty} questions on ${topicName}.`
+            })
+          });
+          if (!fallbackRes.ok) throw new Error('Generation failed');
+          const data = await fallbackRes.json();
+          launchGame(data);
+        }
+      };
+
+      generateStreaming().catch((err) => {
+        clearConnectionTimers();
+        setUploadProgress(0);
+        setError('AI quiz generation failed. Check server connection.');
+        console.error('[Strands] Live generation error:', err);
+      });
     },
     [useMockMode, playerId, buildMockPlayers, saveHostSession, setupSocketListeners, startConnectionTimers, clearConnectionTimers],
   );

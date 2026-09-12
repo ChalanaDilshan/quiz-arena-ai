@@ -22,6 +22,9 @@ from main import (
     build_quiz_generator_agent,
     GenerateQuizRequest,
     generate_quiz,
+    generate_quiz_stream,
+    TutorRequest,
+    tutor_stream,
     health
 )
 import asyncio
@@ -116,6 +119,46 @@ class TestBedrockAndAgentIntegration(unittest.TestCase):
         self.assertEqual(res["provider"], "Amazon Bedrock")
         self.assertTrue(res["agentcore_deployment_ready"])
         self.assertIn("quiz_generator", res["agents"])
+
+    def test_tutor_stream_endpoint(self):
+        req = TutorRequest(
+            question_text="What is the capital of France?",
+            player_answer="London",
+            correct_answer="Paris"
+        )
+        response = asyncio.run(tutor_stream(req))
+        self.assertEqual(response.media_type, "text/event-stream")
+
+        async def collect_stream():
+            chunks = []
+            async for chunk in response.body_iterator:
+                chunks.append(chunk)
+            return "".join(chunks)
+
+        body = asyncio.run(collect_stream())
+        self.assertIn("data:", body)
+        self.assertIn('"done": true', body)
+
+    def test_generate_quiz_stream_endpoint(self):
+        req = GenerateQuizRequest(
+            topic="Distributed Systems",
+            difficulty="Medium",
+            num_questions=2,
+            syllabus_text="Raft and Paxos consensus algorithms"
+        )
+        response = asyncio.run(generate_quiz_stream(req))
+        self.assertEqual(response.media_type, "text/event-stream")
+
+        async def collect_stream():
+            chunks = []
+            async for chunk in response.body_iterator:
+                chunks.append(chunk)
+            return "".join(chunks)
+
+        body = asyncio.run(collect_stream())
+        self.assertIn("PARSING", body)
+        self.assertIn("COMPLETE", body)
+        self.assertIn("Distributed Systems", body)
 
 
 if __name__ == '__main__':
