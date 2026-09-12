@@ -449,6 +449,20 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Host-only: immediately end the game mid-session
+  socket.on('endGame', ({ pin, hostToken }) => {
+    const room = rooms.get(pin);
+    if (isHostAuthorized(room, socket, hostToken)) {
+      if (room.timerInterval) clearInterval(room.timerInterval);
+      room.state = 'GAME_OVER';
+      // Move to recentRooms for post-game Tutor
+      recentRooms.set(pin, { questions: room.questions });
+      setTimeout(() => recentRooms.delete(pin), 15 * 60 * 1000);
+      broadcastState(pin);
+      rooms.delete(pin);
+    }
+  });
+
   socket.on('kickPlayer', ({ pin, targetPlayerId, hostToken }) => {
     const room = rooms.get(pin);
     if (isHostAuthorized(room, socket, hostToken)) {

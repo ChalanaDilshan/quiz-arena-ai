@@ -112,6 +112,7 @@ export interface UseQuizGameReturn {
   startGame: () => void;
   submitAnswer: (answerIndex: number) => void;
   nextQuestion: () => void;
+  stopGame: () => void;
   resetGame: () => void;
   requestHint: () => void;
   kickPlayer: (playerId: string) => void;
@@ -826,6 +827,20 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
     }
   }, [session, gameState, startTimer, useMockMode]);
 
+  /** Host-only: immediately end the current game and move everyone to GAME_OVER */
+  const stopGame = useCallback(() => {
+    if (!session || !isHost) return;
+    clearTimer();
+    if (useMockMode) {
+      setGameState('GAME_OVER');
+    } else {
+      socketRef.current?.emit('endGame', {
+        pin: session.roomPin,
+        hostToken: hostTokenRef.current
+      });
+    }
+  }, [session, isHost, clearTimer, useMockMode]);
+
 
   // ── Hint Master ────────────────────────────────────────────────────────
 
@@ -968,6 +983,7 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
     startGame,
     submitAnswer,
     nextQuestion,
+    stopGame,
     resetGame,
     requestHint,
     kickPlayer,

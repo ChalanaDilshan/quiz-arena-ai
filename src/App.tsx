@@ -8,6 +8,7 @@ import { HomeView } from './components/HomeView';
 import { LobbyView } from './components/LobbyView';
 import { QuestionView } from './components/QuestionView';
 import { LeaderboardView } from './components/LeaderboardView';
+import { HostDashboard } from './components/HostDashboard';
 import { GameOverView } from './components/GameOverView';
 import { AdminDashboard, cleanTitle } from './components/AdminDashboard';
 import { useCommentator } from './hooks/useCommentator';
@@ -153,6 +154,23 @@ function App() {
           />
         );
       case 'QUESTION':
+        // Host gets a read-only dashboard; players get the interactive question view
+        if (game.isHost) {
+          return (
+            <HostDashboard
+              gameState={game.gameState}
+              question={game.currentQuestion}
+              questionNumber={(game.session?.currentQuestionIndex ?? 0) + 1}
+              totalQuestions={game.session?.questions.length ?? 0}
+              timeRemaining={game.timeRemaining}
+              isAnswerRevealed={game.isAnswerRevealed}
+              players={game.players}
+              playerId={game.playerId}
+              onNextQuestion={game.nextQuestion}
+              onStopGame={game.stopGame}
+            />
+          );
+        }
         return game.currentQuestion ? (
           <QuestionView
             question={game.currentQuestion}
@@ -171,6 +189,23 @@ function App() {
         ) : null;
 
       case 'LEADERBOARD':
+        // Host gets the dashboard in leaderboard mode; players get LeaderboardView
+        if (game.isHost) {
+          return (
+            <HostDashboard
+              gameState={game.gameState}
+              question={game.currentQuestion}
+              questionNumber={(game.session?.currentQuestionIndex ?? 0) + 1}
+              totalQuestions={game.session?.questions.length ?? 0}
+              timeRemaining={game.timeRemaining}
+              isAnswerRevealed={game.isAnswerRevealed}
+              players={game.players}
+              playerId={game.playerId}
+              onNextQuestion={game.nextQuestion}
+              onStopGame={game.stopGame}
+            />
+          );
+        }
         return (
           <LeaderboardView
             players={game.players}
