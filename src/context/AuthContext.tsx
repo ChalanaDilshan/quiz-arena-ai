@@ -34,14 +34,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Listen for auth state changes (fires immediately on mount)
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      setUser(firebaseUser);
+    if (!auth) {
       setLoading(false);
-    });
+      return;
+    }
+    const unsubscribe = onAuthStateChanged(
+      auth,
+      (firebaseUser) => {
+        setUser(firebaseUser);
+        setLoading(false);
+      },
+      (error) => {
+        console.warn('[Auth] Firebase auth check notice:', error.message);
+        setUser(null);
+        setLoading(false);
+      }
+    );
     return unsubscribe;
   }, []);
 
   const signInWithGoogle = async () => {
+    if (!auth || !googleProvider) {
+      console.warn('Google sign-in is not configured: missing Firebase API key');
+      return;
+    }
     try {
       await signInWithPopup(auth, googleProvider);
     } catch (err) {
@@ -50,6 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    if (!auth) return;
     try {
       await firebaseSignOut(auth);
     } catch (err) {

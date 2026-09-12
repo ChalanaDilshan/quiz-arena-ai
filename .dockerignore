@@ -5,7 +5,6 @@ dist
 .vscode
 .idea
 *.log
-.env*
 coverage
 .DS_Store
 README.md
