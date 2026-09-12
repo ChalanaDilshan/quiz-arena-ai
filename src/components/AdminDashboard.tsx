@@ -17,6 +17,7 @@ import { trackDailyLogin, type LoginData } from '../utils/userProfile';
 import type { Player, Question } from '../types';
 import { LegalModal, type LegalTab } from './LegalModal';
 import { QuizArenaLogo } from './QuizArenaLogo';
+import { getApiUrl } from '../utils/apiConfig';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -625,7 +626,7 @@ export function AdminDashboard({ onBack, onRehost }: AdminDashboardProps) {
     setErrorNotice(null);
     try {
       const token = await user.getIdToken();
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/agent/pending`, {
+      const res = await fetch(`${getApiUrl()}/api/agent/pending`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (!res.ok) {
@@ -664,7 +665,7 @@ export function AdminDashboard({ onBack, onRehost }: AdminDashboardProps) {
 
     try {
       const token = await user.getIdToken();
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/agent/clear`, { 
+      const res = await fetch(`${getApiUrl()}/api/agent/clear`, { 
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -690,7 +691,7 @@ export function AdminDashboard({ onBack, onRehost }: AdminDashboardProps) {
     setErrorNotice(null);
     try {
       const token = await user.getIdToken();
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/agent/clear`, { 
+      const res = await fetch(`${getApiUrl()}/api/agent/clear`, { 
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -714,7 +715,7 @@ export function AdminDashboard({ onBack, onRehost }: AdminDashboardProps) {
     setErrorNotice(null);
     try {
       const token = await user.getIdToken();
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/agent/trigger`, { 
+      const res = await fetch(`${getApiUrl()}/api/agent/trigger`, { 
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -728,7 +729,7 @@ export function AdminDashboard({ onBack, onRehost }: AdminDashboardProps) {
       const interval = setInterval(async () => {
         attempts++;
         try {
-          const pollRes = await fetch(`${import.meta.env.VITE_API_URL}/api/agent/pending`, {
+          const pollRes = await fetch(`${getApiUrl()}/api/agent/pending`, {
             headers: { 'Authorization': `Bearer ${token}` }
           });
           if (pollRes.ok) {

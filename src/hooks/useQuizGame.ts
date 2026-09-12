@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { extractTextFromPdf } from '../utils/pdfExtractor';
+import { getApiUrl } from '../utils/apiConfig';
 import type { GameState, Question, Player, QuizSession } from '../types';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -470,7 +471,7 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
       // ── Live WebSocket join ──
       try {
         updateIsJoining(true);
-        const url = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+        const url = getApiUrl();
         const socket = io(url);
         socketRef.current = socket;
         
@@ -553,7 +554,7 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
       // Live mode: Request Strands Agents on Bedrock to compile quiz from syllabus with SSE streaming
       setUploadProgress(15);
 
-      const url = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+      const url = getApiUrl();
       const topicName = _file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
 
       let syllabusContent = extractedText;
@@ -713,7 +714,7 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
 
       // Live mode
       try {
-        const url = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+        const url = getApiUrl();
         const socket = io(url);
         socketRef.current = socket;
         
@@ -837,7 +838,7 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
 
     const roomPin = session?.roomPin ?? 'MOCK_TEST_ROOM';
     const questionIndex = session?.currentQuestionIndex ?? 0;
-    const url = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    const url = getApiUrl();
 
     try {
       const res = await fetch(`${url}/api/hint`, {
@@ -906,7 +907,7 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
 
       if (stored.hostToken) {
         hostTokenRef.current = stored.hostToken;
-        const url = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+        const url = getApiUrl();
         const socket = io(url);
         socketRef.current = socket;
 

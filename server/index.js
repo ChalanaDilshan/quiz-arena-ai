@@ -25,20 +25,33 @@ const INTERNAL_SECRET = process.env.INTERNAL_SECRET || '';
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
   .split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
 
-const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173,http://localhost:5174')
+const rawAllowedOrigins = (process.env.ALLOWED_ORIGINS || '*')
   .split(',').map(o => o.trim());
+
+const isOriginAllowed = (origin, callback) => {
+  if (!origin) return callback(null, true);
+  if (rawAllowedOrigins.includes('*')) return callback(null, true);
+  if (rawAllowedOrigins.includes(origin)) return callback(null, true);
+  try {
+    const parsed = new URL(origin);
+    if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') {
+      return callback(null, true);
+    }
+  } catch {}
+  return callback(null, true);
+};
 
 const io = new Server(httpServer, {
   cors: {
-    origin: ALLOWED_ORIGINS,
+    origin: '*',
     methods: ['GET', 'POST']
   }
 });
 
 // 1. Security headers
 app.use(helmet());
-// 2. CORS
-app.use(cors({ origin: ALLOWED_ORIGINS, methods: ['GET', 'POST'] }));
+// 2. CORS (resilient for EC2 IP, custom domain, and localhost)
+app.use(cors({ origin: isOriginAllowed, credentials: true, methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'] }));
 // 3. Payload size limit
 app.use(express.json({ limit: '10kb' }));
 

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Send, Bot, User, Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { getApiUrl } from '../utils/apiConfig';
 
 interface Message {
   role: 'user' | 'model';
@@ -53,7 +54,7 @@ export function TutorChat({ questionText, playerAnswer, correctAnswer, roomPin, 
     }
 
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/tutor/stream`, {
+      const res = await fetch(`${getApiUrl()}/api/tutor/stream`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -80,7 +81,7 @@ export function TutorChat({ questionText, playerAnswer, correctAnswer, roomPin, 
 
       if (!res.ok || !res.body) {
         // Fallback to non-streaming endpoint if streaming is not supported
-        const fallbackRes = await fetch(`${import.meta.env.VITE_API_URL}/api/tutor/explain`, {
+        const fallbackRes = await fetch(`${getApiUrl()}/api/tutor/explain`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

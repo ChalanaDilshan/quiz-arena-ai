@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { getApiUrl } from '../utils/apiConfig';
 
 export interface CommentatorState {
   currentComment: string | null;
@@ -28,7 +29,7 @@ export function useCommentator() {
     };
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/commentary/stream`, {
+      const response = await fetch(`${getApiUrl()}/api/commentary/stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ eventType, data, roomPin }),
