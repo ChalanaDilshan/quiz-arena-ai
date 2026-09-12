@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useMemo, type DragEvent, type ChangeEvent 
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Upload, Users, Zap, FileText, ArrowRight,
-  Sparkles, ChevronLeft, ChevronUp, ChevronDown, LogIn, BookOpen, Check, ArrowLeft, Loader2,
+  Sparkles, ChevronLeft, ChevronUp, ChevronDown, LogIn, BookOpen, Check, ArrowLeft, Loader2, AlertCircle,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { getSavedQuizzes, type SavedQuiz } from '../utils/quizHistory';
@@ -486,8 +486,16 @@ export function HomeView({
                           </p>
                         </div>
 
-                        <button onClick={() => selectedFile && setHostStep('config')} disabled={!selectedFile} className="btn-primary w-full">
-                          Continue <ArrowRight className="w-4 h-4" />
+                        <button onClick={() => selectedFile && setHostStep('config')} disabled={!selectedFile || isExtracting} className="btn-primary w-full">
+                          {isExtracting ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" /> Scanning Document…
+                            </>
+                          ) : (
+                            <>
+                              Continue <ArrowRight className="w-4 h-4" />
+                            </>
+                          )}
                         </button>
 
                         {/* Saved Quizzes Section */}
@@ -528,11 +536,34 @@ export function HomeView({
                           </button>
                         </div>
 
-                  {/* File pill */}
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-rim mb-6" style={{ background: 'var(--color-canvas)' }}>
-                    <FileText className="w-3.5 h-3.5 text-sienna flex-shrink-0" />
-                    <span className="text-xs text-smoke truncate">{selectedFile?.name}</span>
+                  {/* File pill with extraction feedback */}
+                  <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg border border-rim mb-3" style={{ background: 'var(--color-canvas)' }}>
+                    <div className="flex items-center gap-2 truncate">
+                      <FileText className="w-3.5 h-3.5 text-sienna flex-shrink-0" />
+                      <span className="text-xs text-smoke truncate">{selectedFile?.name}</span>
+                    </div>
+                    {isExtracting ? (
+                      <span className="text-[11px] text-sienna font-medium animate-pulse flex-shrink-0">Reading…</span>
+                    ) : extractionStats && extractionStats.wordCount > 0 ? (
+                      <span className="text-[11px] text-emerald-400 font-medium flex-shrink-0">
+                        ✓ {extractionStats.wordCount.toLocaleString()} words
+                      </span>
+                    ) : (
+                      <span className="text-[11px] text-amber-400 font-medium flex-shrink-0">
+                        0 words found
+                      </span>
+                    )}
                   </div>
+
+                  {/* Warning if PDF text is empty */}
+                  {extractionStats && extractionStats.wordCount === 0 && (
+                    <div className="flex items-start gap-2 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 mb-4 text-left">
+                      <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                      <p className="text-[11px] text-amber-300 leading-tight">
+                        No readable text found in this PDF (it may be a scanned image). Questions will be based on the filename topic. For questions from your document, upload a text PDF.
+                      </p>
+                    </div>
+                  )}
 
                   {/* Question count */}
                   <div className="mb-5">

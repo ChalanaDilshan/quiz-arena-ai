@@ -592,22 +592,31 @@ def build_hint_master_agent() -> Agent:
 # ===========================================================================
 
 QUIZ_GENERATOR_PROMPT = """
-You are an expert curriculum and quiz author embedded in Quiz Arena.
-Your task is to generate challenging, balanced, and engaging multiple-choice questions.
-Always output strictly a valid JSON array of question objects.
-Each question object MUST contain:
-- "id": string (e.g. "q1")
-- "text": string question text
-- "options": array of exactly 4 distinct strings
-- "correctIndex": integer (0, 1, 2, or 3)
-- "timeLimit": integer seconds (typically 20)
-- "explanation": concise 1-2 sentence explanation
-Output strictly valid JSON with no markdown wrapping or preamble.
+You are an expert exam author and curriculum specialist for Quiz Arena.
+Your absolute top priority is grounded factual accuracy:
+1. When a source document or context material is provided, you MUST formulate every question and answer directly and exclusively from the specific facts, requirements, guidelines, definitions, concepts, and instructions found inside that document.
+2. DO NOT make up generic questions or rely on outside knowledge if document content is provided.
+3. Each question must test a meaningful point from the text.
+4. Provide 4 distinct options (A, B, C, D) where exactly 1 is unambiguously correct according to the context text, and the remaining 3 are plausible distractors.
+5. In the "explanation" field, explicitly cite or quote the part of the document that proves the correct answer.
+6. If no document content is provided, generate high-quality questions on the specified topic.
+Always output strictly a valid JSON array of question objects matching the schema:
+[
+  {
+    "id": "q1",
+    "text": "Question text here?",
+    "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
+    "correctIndex": 0,
+    "timeLimit": 20,
+    "explanation": "Explanation citing the text."
+  }
+]
+No markdown wrapping, no conversational preamble.
 """.strip()
 
 def build_quiz_generator_agent() -> Agent:
     return Agent(
-        model=make_model(temperature=0.4),
+        model=make_model(temperature=0.3),
         system_prompt=QUIZ_GENERATOR_PROMPT,
     )
 
@@ -973,15 +982,29 @@ async def hint(req: HintRequest):
 async def generate_quiz(req: GenerateQuizRequest):
     safe_topic = sanitize(req.topic, 100) or "AWS & Cloud Fundamentals"
     safe_diff = sanitize(req.difficulty, 30) or "Medium"
-    safe_text = sanitize(req.syllabus_text, 10000)
+    safe_text = sanitize(req.syllabus_text, 50000)
     num_q = max(2, min(req.num_questions, 20))
 
     agent = build_quiz_generator_agent()
-    prompt = (
-        f"Generate {num_q} multiple-choice questions for topic '{safe_topic}' with difficulty '{safe_diff}'.\n"
-        f"Context material:\n{safe_text}\n\n"
-        f"Strictly output a JSON array of {num_q} question objects matching the required schema."
-    )
+    if safe_text and len(safe_text.strip()) > 30:
+        prompt = (
+            f"You are generating a quiz based STRICTLY and EXCLUSIVELY on the provided source document ({safe_topic}).\n\n"
+            f"<document_content>\n{safe_text}\n</document_content>\n\n"
+            f"TASK: Generate exactly {num_q} multiple-choice questions with difficulty '{safe_diff}'.\n"
+            f"MANDATORY REQUIREMENTS:\n"
+            f"1. Every question MUST be directly answerable from the <document_content> above.\n"
+            f"2. Every question must test a real requirement, deadline, concept, definition, rule, or fact from the text.\n"
+            f"3. Do NOT make up questions from general knowledge or outside of this document.\n"
+            f"4. Provide exactly 4 options per question with exactly 1 correct option (0, 1, 2, or 3).\n"
+            f"5. In the 'explanation' field, cite or quote the specific detail from the document that proves the answer.\n\n"
+            f"Output strictly a JSON array of {num_q} question objects matching the required schema."
+        )
+    else:
+        prompt = (
+            f"Generate {num_q} multiple-choice questions for topic '{safe_topic}' with difficulty '{safe_diff}'.\n"
+            f"Strictly output a JSON array of {num_q} question objects matching the required schema."
+        )
+
     raw_res = safe_agent_call(
         agent,
         prompt,
@@ -1023,7 +1046,7 @@ async def generate_quiz(req: GenerateQuizRequest):
 async def generate_quiz_stream(req: GenerateQuizRequest):
     safe_topic = sanitize(req.topic, 100) or "AWS & Cloud Fundamentals"
     safe_diff = sanitize(req.difficulty, 30) or "Medium"
-    safe_text = sanitize(req.syllabus_text, 10000)
+    safe_text = sanitize(req.syllabus_text, 50000)
     num_q = max(2, min(req.num_questions, 20))
 
     async def stream_generator():
@@ -1035,11 +1058,25 @@ async def generate_quiz_stream(req: GenerateQuizRequest):
         yield f"data: {json.dumps({'stage': 'DRAFTING', 'percent': 50, 'message': f'Synthesizing {num_q} {safe_diff} questions with distractors…'})}\n\n"
 
         agent = build_quiz_generator_agent()
-        prompt = (
-            f"Generate {num_q} multiple-choice questions for topic '{safe_topic}' with difficulty '{safe_diff}'.\n"
-            f"Context material:\n{safe_text}\n\n"
-            f"Strictly output a JSON array of {num_q} question objects matching the required schema."
-        )
+        if safe_text and len(safe_text.strip()) > 30:
+            prompt = (
+                f"You are generating a quiz based STRICTLY and EXCLUSIVELY on the provided source document ({safe_topic}).\n\n"
+                f"<document_content>\n{safe_text}\n</document_content>\n\n"
+                f"TASK: Generate exactly {num_q} multiple-choice questions with difficulty '{safe_diff}'.\n"
+                f"MANDATORY REQUIREMENTS:\n"
+                f"1. Every question MUST be directly answerable from the <document_content> above.\n"
+                f"2. Every question must test a real requirement, deadline, concept, definition, rule, or fact from the text.\n"
+                f"3. Do NOT make up questions from general knowledge or outside of this document.\n"
+                f"4. Provide exactly 4 options per question with exactly 1 correct option (0, 1, 2, or 3).\n"
+                f"5. In the 'explanation' field, cite or quote the specific detail from the document that proves the answer.\n\n"
+                f"Output strictly a JSON array of {num_q} question objects matching the required schema."
+            )
+        else:
+            prompt = (
+                f"Generate {num_q} multiple-choice questions for topic '{safe_topic}' with difficulty '{safe_diff}'.\n"
+                f"Strictly output a JSON array of {num_q} question objects matching the required schema."
+            )
+
         raw_res = safe_agent_call(
             agent,
             prompt,

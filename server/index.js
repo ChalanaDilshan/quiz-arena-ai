@@ -758,7 +758,7 @@ app.post('/api/generate-quiz', apiLimiter, async (req, res) => {
 
   try {
     const result = await callStrands('/generate-quiz', {
-      syllabus_text: typeof syllabusText === 'string' ? syllabusText.slice(0, 10000) : '',
+      syllabus_text: typeof syllabusText === 'string' ? syllabusText.slice(0, 50000) : '',
       topic: typeof topic === 'string' ? topic.slice(0, 100) : 'AWS & Cloud Architecture',
       num_questions: Number(numQuestions) || 5,
       difficulty: typeof difficulty === 'string' ? difficulty.slice(0, 30) : 'Medium',
@@ -774,7 +774,7 @@ app.post('/api/generate-quiz/stream', apiLimiter, async (req, res) => {
   const { syllabusText, topic, numQuestions, difficulty } = req.body ?? {};
 
   await proxyStrandsStream('/generate-quiz/stream', {
-    syllabus_text: typeof syllabusText === 'string' ? syllabusText.slice(0, 10000) : '',
+    syllabus_text: typeof syllabusText === 'string' ? syllabusText.slice(0, 50000) : '',
     topic: typeof topic === 'string' ? topic.slice(0, 100) : 'AWS & Cloud Architecture',
     num_questions: Number(numQuestions) || 5,
     difficulty: typeof difficulty === 'string' ? difficulty.slice(0, 30) : 'Medium',
