@@ -97,6 +97,7 @@ export interface UseQuizGameReturn {
   uploadProgress: number;
   playerId: string;
   error: string | null;
+  isJoining: boolean;
 
   // Hint Master
   hint: string | null;
@@ -128,6 +129,13 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [playerId] = useState(() => generateId());
   const [error, setError] = useState<string | null>(null);
+  const [isJoining, setIsJoining] = useState(false);
+  const isJoiningRef = useRef(false);
+
+  const updateIsJoining = useCallback((val: boolean) => {
+    isJoiningRef.current = val;
+    setIsJoining(val);
+  }, []);
 
   // Hint Master state
   const [hint, setHint] = useState<string | null>(null);
@@ -163,13 +171,14 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
 
     // 15s failure timeout
     failTimerRef.current = setTimeout(() => {
+      updateIsJoining(false);
       if (socketRef.current && !socketRef.current.connected) {
         setError('Unable to reach game server. Please verify the server is running and try again.');
         socketRef.current?.disconnect();
         socketRef.current = null;
       }
     }, 15000);
-  }, [clearConnectionTimers]);
+  }, [clearConnectionTimers, updateIsJoining]);
 
   const saveHostSession = useCallback((data: StoredHostSession) => {
     try {
@@ -289,6 +298,7 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
     clearTimer();
     clearConnectionTimers();
     clearHostSession();
+    updateIsJoining(false);
     setGameState('HOME');
     setSession(null);
     setSelectedAnswer(null);
@@ -301,7 +311,7 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
     setHintLoading(false);
     socketRef.current?.disconnect();
     socketRef.current = null;
-  }, [clearTimer, clearConnectionTimers, clearHostSession]);
+  }, [clearTimer, clearConnectionTimers, clearHostSession, updateIsJoining]);
 
   // ── WebSocket message handler (live mode) ──────────────────────────────
 
@@ -312,6 +322,7 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
     });
 
     socket.on('connect_error', (err) => {
+      updateIsJoining(false);
       console.warn('[QuizGame] Socket connection error:', err.message);
       // Ensure the timers are actively ticking toward timeout notifications
       if (!connectTimerRef.current && !failTimerRef.current && !socket.connected) {
@@ -320,6 +331,9 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
     });
 
     socket.on('gameStateUpdate', (state) => {
+      if (state.state === 'LOBBY') {
+        updateIsJoining(false);
+      }
       setGameState(state.state);
       setSession(prev => {
         let questions = prev?.questions ? [...prev.questions] : [];
@@ -375,13 +389,16 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
       }
     });
 
-    socket.on('error', (msg) => setError(msg));
+    socket.on('error', (msg) => {
+      updateIsJoining(false);
+      setError(msg);
+    });
     
     socket.on('kicked', () => {
       setError('You have been kicked by the host.');
       resetGame();
     });
-  }, [resetGame, saveHostSession, playerId, clearConnectionTimers, startConnectionTimers]);
+  }, [resetGame, saveHostSession, playerId, clearConnectionTimers, startConnectionTimers, updateIsJoining]);
 
   // ── Actions ────────────────────────────────────────────────────────────
 
@@ -423,6 +440,7 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
 
   const joinGame = useCallback(
     (pin: string, nickname: string) => {
+      if (isJoiningRef.current) return;
       setError(null);
 
       if (useMockMode) {
@@ -445,11 +463,13 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
         setSession(newSession);
         setIsHost(false);
         setGameState('LOBBY');
+        updateIsJoining(false);
         return;
       }
 
       // ── Live WebSocket join ──
       try {
+        updateIsJoining(true);
         const url = import.meta.env.VITE_API_URL || 'http://localhost:3001';
         const socket = io(url);
         socketRef.current = socket;
@@ -457,15 +477,22 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
         startConnectionTimers();
         setupSocketListeners(socket, pin);
 
-        socket.on('connect', () => {
+        if (socket.connected) {
+          updateIsJoining(true);
           socket.emit('joinGame', { pin, nickname, playerId });
-        });
+        } else {
+          socket.on('connect', () => {
+            updateIsJoining(true);
+            socket.emit('joinGame', { pin, nickname, playerId });
+          });
+        }
       } catch {
+        updateIsJoining(false);
         clearConnectionTimers();
         setError('Could not connect to game server.');
       }
     },
-    [useMockMode, playerId, buildMockPlayers, setupSocketListeners, startConnectionTimers, clearConnectionTimers],
+    [useMockMode, playerId, buildMockPlayers, setupSocketListeners, startConnectionTimers, clearConnectionTimers, updateIsJoining],
   );
 
   const hostGame = useCallback(
@@ -930,6 +957,7 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
     uploadProgress,
     playerId,
     error,
+    isJoining,
     hint,
     hintLoading,
     hintUsed,

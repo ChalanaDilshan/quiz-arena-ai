@@ -124,6 +124,7 @@ function App() {
           <HomeView
             initialTab={initialTab}
             initialPin={initialPin}
+            isJoining={game.isJoining}
             onJoinGame={game.joinGame}
             onHostGame={(file, numQ, diff, extractedText) => {
               setHostFileName(file.name);
