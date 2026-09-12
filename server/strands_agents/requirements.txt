@@ -5,3 +5,5 @@ uvicorn[standard]
 python-dotenv
 pydantic
 boto3
+pypdf
+python-multipart
