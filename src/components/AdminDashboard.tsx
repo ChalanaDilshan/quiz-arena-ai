@@ -5,7 +5,7 @@ import {
   Target, Trash2, ChevronRight, Calendar, BookOpen,
   TrendingUp, AlertTriangle, CheckCircle2, Download,
   FileSpreadsheet, X, Award, Bot, Search, ArrowUpDown,
-  MoreVertical, ChevronDown, Play, AlertCircle, RotateCcw,
+  MoreVertical, ChevronDown, ChevronUp, Play, AlertCircle, RotateCcw,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -385,6 +385,15 @@ function QuizCard({
             >
               {record.difficulty}
             </span>
+            {record.isFallback && (
+              <span
+                title="Generated via fallback template"
+                className="text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 bg-amber-500/15 text-amber-300 border border-amber-500/30 flex items-center gap-1"
+              >
+                <AlertTriangle className="w-3 h-3" />
+                Fallback
+              </span>
+            )}
           </div>
 
           <div className="flex items-center gap-2 mt-1 text-xs text-smoke flex-wrap">
@@ -616,6 +625,9 @@ export function AdminDashboard({ onBack, onRehost }: AdminDashboardProps) {
   }
   const [errorNotice, setErrorNotice] = useState<ErrorNotice | null>(null);
   const [pendingQuiz, setPendingQuiz] = useState<Question[] | null>(null);
+  const [isPendingFallback, setIsPendingFallback] = useState(false);
+  const [pendingTopic, setPendingTopic] = useState('CS 101: Curriculum Topic');
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
   const [isTriggering, setIsTriggering] = useState(false);
   const [legalModalOpen, setLegalModalOpen] = useState(false);
@@ -635,6 +647,11 @@ export function AdminDashboard({ onBack, onRehost }: AdminDashboardProps) {
       const data = await res.json();
       if (data.pendingQuiz) {
         setPendingQuiz(data.pendingQuiz);
+        setIsPendingFallback(Boolean(data.isFallback || data.is_fallback));
+        if (data.topic) setPendingTopic(data.topic);
+      } else {
+        setPendingQuiz(null);
+        setIsPendingFallback(false);
       }
     } catch (err) {
       console.error('[AdminDashboard] Failed to fetch pending quiz:', err);
@@ -657,9 +674,10 @@ export function AdminDashboard({ onBack, onRehost }: AdminDashboardProps) {
     
     saveQuiz(user.uid, {
       id: `syllabus_${Date.now()}`,
-      topic: 'CS 101: React Hooks Fundamentals',
+      topic: pendingTopic || 'CS 101: Curriculum Topic',
       dateSaved: new Date().toISOString(),
       questions: pendingQuiz,
+      isFallback: isPendingFallback,
     });
     refreshRecords();
 
@@ -673,6 +691,8 @@ export function AdminDashboard({ onBack, onRehost }: AdminDashboardProps) {
         throw new Error(`Server returned HTTP ${res.status}`);
       }
       setPendingQuiz(null);
+      setIsPendingFallback(false);
+      setIsPreviewOpen(false);
     } catch (err) {
       console.error('[AdminDashboard] Failed to clear approved quiz:', err);
       setErrorNotice({
@@ -699,6 +719,8 @@ export function AdminDashboard({ onBack, onRehost }: AdminDashboardProps) {
         throw new Error(`Server returned HTTP ${res.status}`);
       }
       setPendingQuiz(null);
+      setIsPendingFallback(false);
+      setIsPreviewOpen(false);
     } catch (err) {
       console.error('[AdminDashboard] Failed to dismiss quiz:', err);
       setErrorNotice({
@@ -736,6 +758,8 @@ export function AdminDashboard({ onBack, onRehost }: AdminDashboardProps) {
             const data = await pollRes.json();
             if (data.pendingQuiz) {
               setPendingQuiz(data.pendingQuiz);
+              setIsPendingFallback(Boolean(data.isFallback || data.is_fallback));
+              if (data.topic) setPendingTopic(data.topic);
               setIsTriggering(false);
               clearInterval(interval);
               return;
@@ -956,37 +980,174 @@ export function AdminDashboard({ onBack, onRehost }: AdminDashboardProps) {
                     exit={{ opacity: 0, y: -20, height: 0 }}
                     className="mb-8 overflow-hidden"
                   >
-                    <div className="card rounded-2xl p-5 border-2 border-indigo-500/30 bg-indigo-500/5 shadow-[0_0_30px_rgba(99,102,241,0.1)]">
-                      <div className="flex items-start gap-4">
-                        <div className="w-10 h-10 rounded-full bg-indigo-500/20 flex items-center justify-center flex-shrink-0 mt-1">
-                          <Bot className="w-5 h-5 text-indigo-400" />
-                        </div>
-                        <div className="flex-1">
-                          <h3 className="text-sm font-bold text-indigo-300 flex items-center gap-2 mb-1">
-                            🤖 AI Agent Notification
-                          </h3>
-                          <p className="text-sm text-alabaster mb-4">
-                            I scanned your CS 101 syllabus. You are teaching <strong>React Hooks Fundamentals</strong> next week. I autonomously generated a 5-question Quiz Arena match for it. Would you like to review and publish it to your class?
-                          </p>
-                          <div className="flex items-center gap-3">
-                            <button
-                              onClick={handleApproveQuiz}
-                              disabled={isApproving}
-                              className="btn-primary text-xs !py-2 !px-4 flex items-center gap-2"
-                            >
-                              <CheckCircle2 className="w-4 h-4" />
-                              {isApproving ? 'Saving...' : 'Review & Publish'}
-                            </button>
-                            <button
-                              onClick={handleDismissQuiz}
-                              className="btn-ghost text-xs !py-2 !px-4 text-smoke hover:text-alabaster"
-                            >
-                              Dismiss
-                            </button>
+                    {isPendingFallback ? (
+                      /* Warning Banner: Fallback Mode */
+                      <div className="card rounded-2xl p-5 border-2 border-amber-500/40 bg-gradient-to-br from-amber-500/10 via-amber-950/20 to-transparent shadow-[0_0_30px_rgba(245,158,11,0.15)]">
+                        <div className="flex items-start gap-4">
+                          <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center flex-shrink-0 mt-1 border border-amber-500/40 text-amber-400">
+                            <AlertTriangle className="w-5 h-5" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                              <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 uppercase tracking-wider">
+                                ⚠️ Fallback Template Mode
+                              </span>
+                              <span className="text-xs text-amber-200/70">
+                                Bedrock Agent Parsing Fallback
+                              </span>
+                            </div>
+                            <h3 className="text-base font-bold text-amber-200 mb-1">
+                              Review Required: Standardized Questions Used
+                            </h3>
+                            <p className="text-sm text-alabaster/90 mb-3 leading-relaxed">
+                              The AI agent encountered an upstream Bedrock / parsing timeout while reading your syllabus document. Standardized template questions were generated for <strong>{pendingTopic}</strong> instead of genuine syllabus-extracted questions. Please inspect the {pendingQuiz.length} questions below before approving.
+                            </p>
+
+                            {/* Collapsible Questions Preview */}
+                            <div className="mb-4">
+                              <button
+                                type="button"
+                                onClick={() => setIsPreviewOpen((prev) => !prev)}
+                                className="text-xs font-medium text-amber-300 hover:text-amber-200 flex items-center gap-1.5 py-1 px-2.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 transition-colors"
+                              >
+                                {isPreviewOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                                {isPreviewOpen ? 'Hide Question Preview' : `Inspect ${pendingQuiz.length} Generated Questions`}
+                              </button>
+
+                              {isPreviewOpen && (
+                                <div className="mt-3 space-y-2.5 max-h-64 overflow-y-auto pr-2 rounded-xl bg-black/40 border border-amber-500/20 p-3">
+                                  {pendingQuiz.map((q, idx) => (
+                                    <div key={q.id || idx} className="text-xs p-2.5 rounded-lg bg-white/5 border border-white/10">
+                                      <div className="font-semibold text-alabaster mb-1.5">
+                                        <span className="text-amber-400 mr-1.5">Q{idx + 1}.</span> {q.text}
+                                      </div>
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 mb-1.5">
+                                        {q.options.map((opt, oIdx) => (
+                                          <div
+                                            key={oIdx}
+                                            className={`px-2 py-1 rounded text-[11px] ${
+                                              oIdx === q.correctIndex
+                                                ? 'bg-emerald-500/20 text-emerald-300 font-medium border border-emerald-500/30'
+                                                : 'bg-white/5 text-smoke'
+                                            }`}
+                                          >
+                                            {String.fromCharCode(65 + oIdx)}. {opt}
+                                          </div>
+                                        ))}
+                                      </div>
+                                      {q.explanation && (
+                                        <div className="text-[11px] text-smoke/90 italic">
+                                          💡 {q.explanation}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-3">
+                              <button
+                                onClick={handleApproveQuiz}
+                                disabled={isApproving}
+                                className="btn-primary text-xs !py-2 !px-4 flex items-center gap-2 bg-amber-600 hover:bg-amber-500 text-black font-bold"
+                              >
+                                <CheckCircle2 className="w-4 h-4" />
+                                {isApproving ? 'Saving...' : 'Approve Fallback Draft'}
+                              </button>
+                              <button
+                                onClick={handleDismissQuiz}
+                                className="btn-ghost text-xs !py-2 !px-4 text-smoke hover:text-alabaster"
+                              >
+                                Reject & Dismiss
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
+                    ) : (
+                      /* Standard Verified Syllabus Generation */
+                      <div className="card rounded-2xl p-5 border-2 border-indigo-500/30 bg-indigo-500/5 shadow-[0_0_30px_rgba(99,102,241,0.1)]">
+                        <div className="flex items-start gap-4">
+                          <div className="w-10 h-10 rounded-full bg-indigo-500/20 flex items-center justify-center flex-shrink-0 mt-1">
+                            <Bot className="w-5 h-5 text-indigo-400" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1.5">
+                              <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 uppercase tracking-wider">
+                                ✨ Syllabus Grounded
+                              </span>
+                            </div>
+                            <h3 className="text-sm font-bold text-indigo-300 flex items-center gap-2 mb-1">
+                              🤖 AI Agent Notification
+                            </h3>
+                            <p className="text-sm text-alabaster mb-3">
+                              I scanned your syllabus for <strong>{pendingTopic}</strong> and autonomously generated a {pendingQuiz.length}-question Quiz Arena match grounded directly in your curriculum. Would you like to review and publish it to your class?
+                            </p>
+
+                            {/* Collapsible Questions Preview */}
+                            <div className="mb-4">
+                              <button
+                                type="button"
+                                onClick={() => setIsPreviewOpen((prev) => !prev)}
+                                className="text-xs font-medium text-indigo-300 hover:text-indigo-200 flex items-center gap-1.5 py-1 px-2.5 rounded-lg bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-500/30 transition-colors"
+                              >
+                                {isPreviewOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                                {isPreviewOpen ? 'Hide Question Preview' : `Inspect ${pendingQuiz.length} Generated Questions`}
+                              </button>
+
+                              {isPreviewOpen && (
+                                <div className="mt-3 space-y-2.5 max-h-64 overflow-y-auto pr-2 rounded-xl bg-black/40 border border-indigo-500/20 p-3">
+                                  {pendingQuiz.map((q, idx) => (
+                                    <div key={q.id || idx} className="text-xs p-2.5 rounded-lg bg-white/5 border border-white/10">
+                                      <div className="font-semibold text-alabaster mb-1.5">
+                                        <span className="text-indigo-400 mr-1.5">Q{idx + 1}.</span> {q.text}
+                                      </div>
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 mb-1.5">
+                                        {q.options.map((opt, oIdx) => (
+                                          <div
+                                            key={oIdx}
+                                            className={`px-2 py-1 rounded text-[11px] ${
+                                              oIdx === q.correctIndex
+                                                ? 'bg-emerald-500/20 text-emerald-300 font-medium border border-emerald-500/30'
+                                                : 'bg-white/5 text-smoke'
+                                            }`}
+                                          >
+                                            {String.fromCharCode(65 + oIdx)}. {opt}
+                                          </div>
+                                        ))}
+                                      </div>
+                                      {q.explanation && (
+                                        <div className="text-[11px] text-smoke/90 italic">
+                                          💡 {q.explanation}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                              <button
+                                onClick={handleApproveQuiz}
+                                disabled={isApproving}
+                                className="btn-primary text-xs !py-2 !px-4 flex items-center gap-2"
+                              >
+                                <CheckCircle2 className="w-4 h-4" />
+                                {isApproving ? 'Saving...' : 'Review & Publish'}
+                              </button>
+                              <button
+                                onClick={handleDismissQuiz}
+                                className="btn-ghost text-xs !py-2 !px-4 text-smoke hover:text-alabaster"
+                              >
+                                Dismiss
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </motion.div>
                 )}
               </AnimatePresence>

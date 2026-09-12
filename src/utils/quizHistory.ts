@@ -14,6 +14,7 @@ export interface QuizRecord {
   avgScore: number;
   accuracy: number;       // 0–100 integer
   totalPlayers: number;
+  isFallback?: boolean;
 }
 
 export interface SavedQuiz {
@@ -21,6 +22,7 @@ export interface SavedQuiz {
   topic: string;
   dateSaved: string;
   questions: Question[];
+  isFallback?: boolean;
 }
 
 // ─── Storage key ──────────────────────────────────────────────────────────────
@@ -101,8 +103,9 @@ export function buildQuizRecord(params: {
   difficulty: string;
   players: Player[];
   questions: Question[];
+  isFallback?: boolean;
 }): QuizRecord {
-  const { roomPin, fileName, difficulty, players, questions } = params;
+  const { roomPin, fileName, difficulty, players, questions, isFallback } = params;
   const nonHostPlayers = players.filter((p) => !p.isHost);
   const numQ = questions.length;
 
@@ -137,5 +140,6 @@ export function buildQuizRecord(params: {
     avgScore,
     accuracy,
     totalPlayers: nonHostPlayers.length,
+    isFallback: Boolean(isFallback),
   };
 }

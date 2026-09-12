@@ -158,6 +158,7 @@ function broadcastState(pin) {
         : null,
     totalQuestions: room.questions.length,
     timeRemaining: room.timeRemaining,
+    isFallback: Boolean(room.isFallback),
     // Provide full question list at GAME_OVER for post-match tutor & analytics
     questions: room.state === 'GAME_OVER' ? room.questions : undefined
   };
@@ -224,6 +225,7 @@ io.on('connection', (socket) => {
       }],
       questions: quizData.questions,
       topic: quizData.topic,
+      isFallback: Boolean(quizData.isFallback),
       currentQuestionIndex: 0,
       state: 'LOBBY',
       timeRemaining: 20,
@@ -804,7 +806,13 @@ app.post('/api/commentary/stream', apiLimiter, requireValidRoom, async (req, res
 app.post('/api/agent/trigger', requireAgentAuth, apiLimiter, async (req, res) => {
   try {
     const result = await callStrands('/syllabus/trigger', {}, 90000); // 90 s — background autonomous agent
-    res.json({ success: true, result });
+    const isFallback = Boolean(result?.is_fallback || result?.isFallback);
+    res.json({
+      success: true,
+      result,
+      isFallback,
+      is_fallback: isFallback
+    });
   } catch (err) {
     res.status(500).json({ error: 'Agent task failed.' });
   }
@@ -813,9 +821,16 @@ app.post('/api/agent/trigger', requireAgentAuth, apiLimiter, async (req, res) =>
 app.get('/api/agent/pending', requireAgentAuth, apiLimiter, async (req, res) => {
   try {
     const result = await getStrands('/syllabus/pending');
-    res.json({ pendingQuiz: result.pending_quiz, filename: result.filename });
+    const isFallback = Boolean(result?.is_fallback || result?.isFallback);
+    res.json({
+      pendingQuiz: result.pending_quiz,
+      filename: result.filename,
+      topic: result.topic,
+      isFallback,
+      is_fallback: isFallback
+    });
   } catch (err) {
-    res.json({ pendingQuiz: null });
+    res.json({ pendingQuiz: null, isFallback: false, is_fallback: false });
   }
 });
 
@@ -851,7 +866,12 @@ app.post('/api/generate-quiz', apiLimiter, async (req, res) => {
       num_questions: Number(numQuestions) || 5,
       difficulty: typeof difficulty === 'string' ? difficulty.slice(0, 30) : 'Medium',
     }, 60000); // 60 s — admin batch generation, users expect a wait
-    res.json(result);
+    const isFallback = Boolean(result?.is_fallback || result?.isFallback);
+    res.json({
+      ...result,
+      isFallback,
+      is_fallback: isFallback
+    });
   } catch (err) {
     res.status(500).json({ error: 'Quiz generator agent failed to generate questions.' });
   }

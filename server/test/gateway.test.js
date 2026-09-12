@@ -255,4 +255,26 @@ test('Gateway Test Suite', async (t) => {
     hostSocket.disconnect();
     playerSocket.disconnect();
   });
+
+  await t.test('hostGame with isFallback broadcasts isFallback flag in gameStateUpdate', async () => {
+    const socket = await connectSocket();
+    const pin = '778899';
+    const mockQuiz = {
+      topic: 'Fallback Test Quiz',
+      isFallback: true,
+      questions: [
+        { id: '1', text: 'Q1', options: ['A', 'B'], correctIndex: 0, timeLimit: 20 },
+      ],
+    };
+
+    const statePromise = new Promise((resolve) => {
+      socket.on('gameStateUpdate', resolve);
+    });
+
+    socket.emit('hostGame', { pin, quizData: mockQuiz, hostId: 'fallback-host' });
+    const state = await statePromise;
+
+    assert.equal(state.isFallback, true, 'gameStateUpdate must include isFallback: true');
+    socket.disconnect();
+  });
 });

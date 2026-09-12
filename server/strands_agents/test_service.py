@@ -26,7 +26,10 @@ from main import (
     generate_quiz_stream,
     TutorRequest,
     tutor_stream,
-    health
+    health,
+    save_quiz_draft,
+    syllabus_pending,
+    syllabus_clear
 )
 import asyncio
 
@@ -144,6 +147,9 @@ class TestBedrockAndAgentIntegration(unittest.TestCase):
         self.assertEqual(res["topic"], "Operating Systems")
         self.assertEqual(res["difficulty"], "Hard")
         self.assertEqual(len(res["questions"]), 3)
+        self.assertIn("is_fallback", res)
+        self.assertIn("isFallback", res)
+        self.assertIsInstance(res["is_fallback"], bool)
         for q in res["questions"]:
             self.assertTrue(q["id"].startswith("q_"))
             self.assertEqual(len(q["options"]), 4)
@@ -194,6 +200,25 @@ class TestBedrockAndAgentIntegration(unittest.TestCase):
         self.assertIn("PARSING", body)
         self.assertIn("COMPLETE", body)
         self.assertIn("Distributed Systems", body)
+        self.assertIn('"is_fallback":', body)
+        self.assertIn('"isFallback":', body)
+
+    def test_syllabus_pending_detects_fallback_flag(self):
+        sample_q = json.dumps([
+            {"text": "Sample Q?", "options": ["A", "B", "C", "D"], "correctIndex": 0, "timeLimit": 20, "explanation": "E"}
+        ])
+        save_quiz_draft("Test Fallback Topic", sample_q, is_fallback=True)
+        filename = None
+        try:
+            pending = asyncio.run(syllabus_pending())
+            self.assertIsNotNone(pending.get("pending_quiz"))
+            self.assertTrue(pending.get("is_fallback"))
+            self.assertTrue(pending.get("isFallback"))
+            self.assertEqual(pending.get("topic"), "Test Fallback Topic")
+            filename = pending.get("filename")
+        finally:
+            if filename:
+                asyncio.run(syllabus_clear({"filename": filename}))
 
 
 if __name__ == '__main__':

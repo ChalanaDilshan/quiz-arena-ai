@@ -333,13 +333,21 @@ def parse_quiz_json(raw: str) -> list[dict]:
             continue
     return recovered
 
-def safe_agent_call(agent: Agent, prompt: str, fallback_type: str = "general", context: dict | None = None) -> str:
-    """Execute Strands Agent with robust error catching and contextual fallback."""
+def safe_agent_call_with_status(agent: Agent, prompt: str, fallback_type: str = "general", context: dict | None = None) -> tuple[str, bool]:
+    """
+    Execute Strands Agent with robust error catching and contextual fallback.
+    Returns (response_text, is_fallback_flag).
+    """
     try:
-        return str(agent(prompt))
+        return str(agent(prompt)), False
     except Exception as exc:
         print(f"[Strands Agents] Runtime note ({type(exc).__name__}): {exc}. Active fallback engaged.")
-        return generate_fallback_response(fallback_type, context or {})
+        return generate_fallback_response(fallback_type, context or {}), True
+
+def safe_agent_call(agent: Agent, prompt: str, fallback_type: str = "general", context: dict | None = None) -> str:
+    """Execute Strands Agent with robust error catching and contextual fallback."""
+    res, _ = safe_agent_call_with_status(agent, prompt, fallback_type, context)
+    return res
 
 # ---------------------------------------------------------------------------
 # Structural input sanitizer (strips control chars + common injection chars)
@@ -554,13 +562,14 @@ def list_existing_quizzes() -> str:
 
 
 @tool
-def save_quiz_draft(topic: str, questions_json: str) -> str:
+def save_quiz_draft(topic: str, questions_json: str, is_fallback: bool = False) -> str:
     """
     Save an agent-generated quiz draft to the quizzes directory.
 
     Args:
         topic: The topic of the quiz (e.g. "React Hooks Fundamentals")
         questions_json: A JSON string containing the array of question objects
+        is_fallback: Whether the draft was generated via fallback templates (default: False)
 
     Returns:
         A success message with the saved filename.
@@ -572,7 +581,12 @@ def save_quiz_draft(topic: str, questions_json: str) -> str:
 
     safe_topic = re.sub(r'[^a-zA-Z0-9_\-]', '_', topic[:30])
     filename = f"quiz_{uuid.uuid4().hex[:8]}_{safe_topic}.json"
-    payload = {"topic": topic, "questions": questions, "status": "pending_approval"}
+    payload = {
+        "topic": topic,
+        "questions": questions,
+        "status": "pending_approval",
+        "is_fallback": bool(is_fallback)
+    }
     payload_str = json.dumps(payload, indent=2, ensure_ascii=False)
     
     if AWS_S3_BUCKET_NAME:
@@ -929,13 +943,23 @@ async def tutor_stream(req: TutorRequest):
 @app.post("/syllabus/trigger", dependencies=[Depends(verify_internal_token)])
 async def syllabus_trigger(_: SyllabusRequest = SyllabusRequest()):
     agent = build_syllabus_agent()
-    result = safe_agent_call(
+    result, agent_fallback = safe_agent_call_with_status(
         agent,
         "Please start your autonomous task: scan available syllabus files, "
         "check for existing quizzes, and generate + save a new quiz if needed.",
         fallback_type="quiz",
-        context={"topic": "Autonomous Syllabus"}
+        context={"topic": "CS 101: Core Curriculum Fundamentals"}
     )
+
+    # If the agent experienced an unrecoverable failure and fell back, save a fallback draft for teacher review
+    if agent_fallback:
+        try:
+            fb_questions = parse_quiz_json(result)
+            if fb_questions:
+                save_quiz_draft("CS 101: Core Curriculum Fundamentals", json.dumps(fb_questions), is_fallback=True)
+        except Exception:
+            pass
+
     # Look for the most recently saved quiz for the dashboard
     latest_quiz = None
     if AWS_S3_BUCKET_NAME:
@@ -959,7 +983,13 @@ async def syllabus_trigger(_: SyllabusRequest = SyllabusRequest()):
                 except Exception:
                     pass
 
-    return {"agent_summary": str(result), "pending_quiz": latest_quiz}
+    is_fb = agent_fallback or (bool(latest_quiz.get("is_fallback", False)) if latest_quiz else False)
+    return {
+        "agent_summary": str(result),
+        "pending_quiz": latest_quiz,
+        "is_fallback": is_fb,
+        "isFallback": is_fb
+    }
 
 
 @app.get("/syllabus/pending", dependencies=[Depends(verify_internal_token)])
@@ -968,28 +998,42 @@ async def syllabus_pending():
     if AWS_S3_BUCKET_NAME:
         response = s3_client.list_objects_v2(Bucket=AWS_S3_BUCKET_NAME, Prefix="quizzes/")
         if "Contents" not in response:
-            return {"pending_quiz": None}
+            return {"pending_quiz": None, "is_fallback": False, "isFallback": False}
         files = sorted([obj for obj in response["Contents"] if obj["Key"].endswith(".json")], key=lambda x: x["LastModified"], reverse=True)
         for f in files:
             try:
                 obj_resp = s3_client.get_object(Bucket=AWS_S3_BUCKET_NAME, Key=f["Key"])
                 data = json.loads(obj_resp["Body"].read().decode("utf-8"))
                 if data.get("status") == "pending_approval":
-                    return {"pending_quiz": data.get("questions"), "filename": f["Key"].split("/")[-1]}
+                    is_fb = bool(data.get("is_fallback", False))
+                    return {
+                        "pending_quiz": data.get("questions"),
+                        "filename": f["Key"].split("/")[-1],
+                        "topic": data.get("topic", "CS 101: Curriculum Topic"),
+                        "is_fallback": is_fb,
+                        "isFallback": is_fb
+                    }
             except Exception:
                 continue
     else:
         if not QUIZZES_DIR.exists():
-            return {"pending_quiz": None}
+            return {"pending_quiz": None, "is_fallback": False, "isFallback": False}
         files = sorted(QUIZZES_DIR.glob("*.json"), key=lambda f: f.stat().st_mtime, reverse=True)
         for f in files:
             try:
                 data = json.loads(f.read_text(encoding="utf-8"))
                 if data.get("status") == "pending_approval":
-                    return {"pending_quiz": data.get("questions"), "filename": f.name}
+                    is_fb = bool(data.get("is_fallback", False))
+                    return {
+                        "pending_quiz": data.get("questions"),
+                        "filename": f.name,
+                        "topic": data.get("topic", "CS 101: Curriculum Topic"),
+                        "is_fallback": is_fb,
+                        "isFallback": is_fb
+                    }
             except Exception:
                 continue
-    return {"pending_quiz": None}
+    return {"pending_quiz": None, "is_fallback": False, "isFallback": False}
 
 
 # Strict quiz filename pattern: quiz_<8 hex chars>_<safe topic>.json
@@ -1104,7 +1148,7 @@ async def generate_quiz(req: GenerateQuizRequest):
             f"CRITICAL FORMAT RULE: Output strictly a valid raw JSON array of {num_q} question objects starting with '[' and ending with ']'. No markdown code fences, no trailing commas, no conversational text."
         )
 
-    raw_res = safe_agent_call(
+    raw_res, agent_fallback = safe_agent_call_with_status(
         agent,
         prompt,
         fallback_type="quiz",
@@ -1112,8 +1156,12 @@ async def generate_quiz(req: GenerateQuizRequest):
     )
 
     questions = parse_quiz_json(raw_res)
+    json_fallback = False
     if not questions:
+        json_fallback = True
         questions = json.loads(generate_fallback_response("quiz", {"topic": safe_topic, "num_questions": num_q}))
+
+    is_fallback = bool(agent_fallback or json_fallback)
 
     validated = []
     for i, q in enumerate(questions[:num_q]):
@@ -1131,7 +1179,9 @@ async def generate_quiz(req: GenerateQuizRequest):
         "difficulty": safe_diff,
         "questions": validated,
         "agent": "QuizGeneratorAgent (Strands Agents SDK)",
-        "provider": "Amazon Bedrock"
+        "provider": "Amazon Bedrock",
+        "is_fallback": is_fallback,
+        "isFallback": is_fallback
     }
 
 
@@ -1170,7 +1220,7 @@ async def generate_quiz_stream(req: GenerateQuizRequest):
                 f"CRITICAL FORMAT RULE: Output strictly a valid raw JSON array of {num_q} question objects starting with '[' and ending with ']'. No markdown code fences, no trailing commas, no conversational text."
             )
 
-        raw_res = safe_agent_call(
+        raw_res, agent_fallback = safe_agent_call_with_status(
             agent,
             prompt,
             fallback_type="quiz",
@@ -1182,8 +1232,12 @@ async def generate_quiz_stream(req: GenerateQuizRequest):
         await asyncio.sleep(0.05)
 
         questions = parse_quiz_json(raw_res)
+        json_fallback = False
         if not questions:
+            json_fallback = True
             questions = json.loads(generate_fallback_response("quiz", {"topic": safe_topic, "num_questions": num_q}))
+
+        is_fallback = bool(agent_fallback or json_fallback)
 
         validated = []
         for i, q in enumerate(questions[:num_q]):
@@ -1201,8 +1255,13 @@ async def generate_quiz_stream(req: GenerateQuizRequest):
             "difficulty": safe_diff,
             "questions": validated,
             "agent": "QuizGeneratorAgent (Strands Agents SDK)",
-            "provider": "Amazon Bedrock"
+            "provider": "Amazon Bedrock",
+            "is_fallback": is_fallback,
+            "isFallback": is_fallback
         }
+
+        # Stage 4: Complete
+        yield f"data: {json.dumps({'stage': 'COMPLETE', 'percent': 100, 'result': result_payload})}\n\n"
 
         # Stage 4: Complete
         yield f"data: {json.dumps({'stage': 'COMPLETE', 'percent': 100, 'result': result_payload})}\n\n"
