@@ -1,0 +1,125 @@
+name: Deploy to EC2
+
+on:
+  # Triggers automatically on every push to main
+  push:
+    branches: [ main ]
+  # Allow manual deploy from the GitHub Actions UI (Actions tab → Run workflow)
+  workflow_dispatch:
+
+# Prevent two deployments from running at the same time
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  # ── 1. Run all CI tests first — deploy only if everything passes ──────────
+  frontend-test:
+    name: Test — Frontend (React + Vite)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+
+  gateway-test:
+    name: Test — Gateway (Node.js)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+        working-directory: server
+      - run: npm test
+        working-directory: server
+
+  strands-test:
+    name: Test — Strands AI Service (Python)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      - name: Install Dependencies
+        working-directory: server/strands_agents
+        run: pip install -r requirements.txt
+      - name: Run Tests
+        working-directory: server/strands_agents
+        env:
+          AWS_REGION: us-east-1
+          BEDROCK_MODEL_ID: anthropic.claude-3-5-sonnet-20241022-v2:0
+          INTERNAL_SECRET: ci-test-secret-internal
+        run: python test_service.py
+
+  # ── 2. Deploy to EC2 via SSH — only runs after ALL tests pass ─────────────
+  deploy:
+    name: Deploy to Production EC2
+    runs-on: ubuntu-latest
+    needs: [ frontend-test, gateway-test, strands-test ]
+    environment: production
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Configure SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: SSH Deploy to EC2
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+              -o StrictHostKeyChecking=no \
+              "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" << 'ENDSSH'
+
+            set -e
+            cd ~/quiz-arena-ai
+
+            echo "=== [1/4] Pulling latest code ==="
+            git pull origin main
+
+            echo "=== [2/4] Writing production environment files ==="
+            printf '%s' "$PROD_ROOT_ENV" > .env
+            printf '%s' "$PROD_BACKEND_ENV" > server/.env
+
+            echo "=== [3/4] Rebuilding and restarting Docker containers ==="
+            docker compose up -d --build --remove-orphans
+
+            echo "=== [4/4] Verifying container health ==="
+            sleep 15
+            docker compose ps
+
+            echo ""
+            echo "✅ Deployment complete!"
+          ENDSSH
+        env:
+          PROD_ROOT_ENV: ${{ secrets.PROD_ROOT_ENV }}
+          PROD_BACKEND_ENV: ${{ secrets.PROD_BACKEND_ENV }}
+
+      - name: Deployment Summary
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "## ✅ Deployment Successful" >> $GITHUB_STEP_SUMMARY
+            echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+            echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+            echo "| **Commit** | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+            echo "| **Deployed by** | ${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| **Branch** | ${{ github.ref_name }} |" >> $GITHUB_STEP_SUMMARY
+            echo "| **Server** | ${{ secrets.EC2_HOST }} |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## ❌ Deployment Failed" >> $GITHUB_STEP_SUMMARY
+            echo "Check the SSH Deploy step logs above for details." >> $GITHUB_STEP_SUMMARY
+          fi
