@@ -560,7 +560,7 @@ export function GameOverView({ players, playerId, session, isHost, isMockMode, h
         </motion.div>
 
         <p className="text-center text-xs mt-8 text-smoke">
-          Developed by <span className="font-semibold text-alabaster">Chalana Dilshan</span>
+          Built for <span className="font-semibold text-alabaster">Agents for Humans Hackathon</span>
         </p>
       </motion.div>
 

@@ -601,7 +601,7 @@ export function HomeView({ onJoinGame, onHostGame, onHostSavedQuiz, uploadProgre
 
         <div className="text-center text-xs mt-5 text-smoke space-y-2">
           <p>
-            AI-powered · Developed by <span className="font-semibold text-alabaster">Chalana Dilshan</span>
+            AI-powered · Built for <span className="font-semibold text-alabaster">Agents for Humans Hackathon</span>
           </p>
           <div className="flex items-center justify-center gap-3 text-[11px]">
             <button

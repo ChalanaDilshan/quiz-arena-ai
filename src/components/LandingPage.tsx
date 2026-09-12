@@ -760,7 +760,7 @@ export function LandingPage({ onHost, onJoin, onOpenAdmin }: LandingPageProps) {
           <div className="flex flex-col sm:flex-row items-center gap-1.5 text-xs text-smoke text-center">
             <span>AI-Driven Real-Time Quiz Competition Platform</span>
             <span className="hidden sm:inline text-smoke/40">•</span>
-            <span className="font-semibold text-alabaster">Developed by Chalana Dilshan</span>
+            <span className="font-semibold text-alabaster">Built for Agents for Humans Hackathon</span>
           </div>
 
           <div className="flex items-center gap-4 text-xs">
