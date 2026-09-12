@@ -555,37 +555,70 @@ const requireValidRoom = (req, res, next) => {
 // Helper — forward a request to the Strands Python service
 // ---------------------------------------------------------------------------
 
-async function callStrands(path, body = {}) {
-  const res = await fetch(`${STRANDS_URL}${path}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      // Internal shared secret — strands-service rejects requests without this.
-      'X-Internal-Token': INTERNAL_SECRET,
-    },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    const err = await res.text().catch(() => 'unknown error');
-    throw Object.assign(new Error(`Strands service error: ${err}`), { status: res.status });
+/**
+ * POST to the Strands Python service with a hard timeout.
+ * If Bedrock is slow or the service stalls the request is aborted after
+ * `timeoutMs` ms, turning an indefinite hang into a fast, catchable error
+ * that the caller can fall back on immediately.
+ *
+ * Sensible per-endpoint defaults (override at call-site where needed):
+ *   commentary  — 8 000 ms  (player-facing, must feel responsive)
+ *   hint        — 8 000 ms  (player-facing, in-game)
+ *   tutor       — 20 000 ms (post-game, player tolerates longer waits)
+ *   quiz-gen    — 30 000 ms (admin workflow, batch generation)
+ *   syllabus    — 30 000 ms (background agent task)
+ */
+async function callStrands(path, body = {}, timeoutMs = 12000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${STRANDS_URL}${path}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        // Internal shared secret — strands-service rejects requests without this.
+        'X-Internal-Token': INTERNAL_SECRET,
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      const err = await res.text().catch(() => 'unknown error');
+      throw Object.assign(new Error(`Strands service error: ${err}`), { status: res.status });
+    }
+    return await res.json();
+  } finally {
+    clearTimeout(timer);
   }
-  return res.json();
 }
 
-async function getStrands(path) {
-  const res = await fetch(`${STRANDS_URL}${path}`, {
-    headers: { 'X-Internal-Token': INTERNAL_SECRET },
-  });
-  if (!res.ok) throw new Error(`Strands GET error: ${res.status}`);
-  return res.json();
+async function getStrands(path, timeoutMs = 5000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${STRANDS_URL}${path}`, {
+      headers: { 'X-Internal-Token': INTERNAL_SECRET },
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error(`Strands GET error: ${res.status}`);
+    return await res.json();
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
-async function proxyStrandsStream(path, body, clientRes) {
+async function proxyStrandsStream(path, body, clientRes, connectTimeoutMs = 30000) {
   clientRes.setHeader('Content-Type', 'text/event-stream');
   clientRes.setHeader('Cache-Control', 'no-cache, no-transform');
   clientRes.setHeader('Connection', 'keep-alive');
   clientRes.setHeader('X-Accel-Buffering', 'no');
   clientRes.flushHeaders();
+
+  // AbortController guards the initial connection to the Strands service.
+  // Once the stream is open (response headers received) we cancel the timer
+  // so long-running generations aren't killed mid-stream.
+  const controller = new AbortController();
+  const connectTimer = setTimeout(() => controller.abort(), connectTimeoutMs);
 
   try {
     const strandsRes = await fetch(`${STRANDS_URL}${path}`, {
@@ -595,7 +628,12 @@ async function proxyStrandsStream(path, body, clientRes) {
         'X-Internal-Token': INTERNAL_SECRET,
       },
       body: JSON.stringify(body),
+      signal: controller.signal,
     });
+
+    // Stream connection established — clear the connection timeout so we don't
+    // abort mid-generation.
+    clearTimeout(connectTimer);
 
     if (!strandsRes.ok || !strandsRes.body) {
       clientRes.write(`data: ${JSON.stringify({ error: 'Strands service stream failed' })}\n\n`);
@@ -636,7 +674,7 @@ app.post('/api/commentary', apiLimiter, requireValidRoom, async (req, res) => {
       event_type:  eventType,
       player_name: data?.nickname ?? 'Unknown',
       context:     data ? JSON.stringify(data) : '',
-    });
+    }, 8000); // 8 s ceiling — commentary is player-facing and must feel responsive
     res.json({ comment: result.comment });
   } catch (err) {
     res.status(500).json({ error: 'Failed to generate commentary' });
@@ -656,7 +694,7 @@ app.post('/api/commentary/stream', apiLimiter, requireValidRoom, async (req, res
     event_type:  eventType,
     player_name: data?.nickname ?? 'Unknown',
     context:     data ? JSON.stringify(data) : '',
-  }, res);
+  }, res, 10000); // 10 s to connect — short, live-game event
 });
 
 // --- Autonomous Syllabus Agent (admin-only) ---
@@ -664,7 +702,7 @@ app.post('/api/commentary/stream', apiLimiter, requireValidRoom, async (req, res
 // before consuming any rate-limit budget (defence-in-depth ordering).
 app.post('/api/agent/trigger', requireAgentAuth, apiLimiter, async (req, res) => {
   try {
-    const result = await callStrands('/syllabus/trigger', {});
+    const result = await callStrands('/syllabus/trigger', {}, 90000); // 90 s — background autonomous agent
     res.json({ success: true, result });
   } catch (err) {
     res.status(500).json({ error: 'Agent task failed.' });
@@ -684,7 +722,7 @@ app.post('/api/agent/approve', requireAgentAuth, apiLimiter, async (req, res) =>
   const { filename } = req.body;
   if (!filename) return res.status(400).json({ error: 'filename required' });
   try {
-    await callStrands('/syllabus/approve', { filename });
+    await callStrands('/syllabus/approve', { filename }, 10000);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Approval failed' });
@@ -694,7 +732,7 @@ app.post('/api/agent/approve', requireAgentAuth, apiLimiter, async (req, res) =>
 app.post('/api/agent/clear', requireAgentAuth, apiLimiter, async (req, res) => {
   const { filename } = req.body ?? {};
   try {
-    await callStrands('/syllabus/clear', { filename });
+    await callStrands('/syllabus/clear', { filename }, 10000);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Clear failed' });
@@ -711,7 +749,7 @@ app.post('/api/generate-quiz', apiLimiter, async (req, res) => {
       topic: typeof topic === 'string' ? topic.slice(0, 100) : 'AWS & Cloud Architecture',
       num_questions: Number(numQuestions) || 5,
       difficulty: typeof difficulty === 'string' ? difficulty.slice(0, 30) : 'Medium',
-    });
+    }, 60000); // 60 s — admin batch generation, users expect a wait
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: 'Quiz generator agent failed to generate questions.' });
@@ -727,7 +765,7 @@ app.post('/api/generate-quiz/stream', apiLimiter, async (req, res) => {
     topic: typeof topic === 'string' ? topic.slice(0, 100) : 'AWS & Cloud Architecture',
     num_questions: Number(numQuestions) || 5,
     difficulty: typeof difficulty === 'string' ? difficulty.slice(0, 30) : 'Medium',
-  }, res);
+  }, res, 60000); // 60 s to connect — batch quiz generation can be slow
 });
 
 // --- Post-game Tutor Agent ---
@@ -745,7 +783,7 @@ app.post('/api/tutor/explain', apiLimiter, requireValidRoom, async (req, res) =>
       player_answer:  playerAnswer ?? '',
       correct_answer: correctAnswer,
       follow_up:      followUp ?? '',
-    });
+    }, 20000); // 20 s — post-game, users tolerate a slightly longer wait
     res.json({ explanation: result.explanation, sessionId: result.session_id });
   } catch (err) {
     if (err.status === 429) return res.status(429).json({ error: 'Rate limit exceeded' });
@@ -806,7 +844,7 @@ app.post('/api/hint', apiLimiter, requireValidRoom, async (req, res) => {
     const result = await callStrands('/hint', {
       question_text: questionText,
       options: options.slice(0, 4).map(o => String(o).substring(0, 120)),
-    });
+    }, 8000); // 8 s — in-game hint, Haiku makes this easily achievable
     res.json({ hint: result.hint });
   } catch (err) {
     res.status(500).json({ error: 'Hint agent failed to respond.' });
