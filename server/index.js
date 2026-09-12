@@ -165,11 +165,20 @@ function broadcastState(pin) {
   io.to(pin).emit('gameStateUpdate', safeState);
 }
 
-function isHostAuthorized(room, socket, hostToken) {
+function isHostAuthorized(room, socket, hostToken, pin) {
   if (!room) return false;
+  const cleanPin = String(pin || room.pin || socket.roomPin || '').trim();
+  if (cleanPin) {
+    socket.join(cleanPin);
+    socket.roomPin = cleanPin;
+  }
   if (room.hostSocket === socket.id) return true;
   if (hostToken && room.hostToken === hostToken) {
     // Rebind hostSocket to current socket if token matches
+    room.hostSocket = socket.id;
+    return true;
+  }
+  if (socket.playerId && room.hostId && socket.playerId === room.hostId) {
     room.hostSocket = socket.id;
     return true;
   }
@@ -197,8 +206,10 @@ io.on('connection', (socket) => {
       return;
     }
 
+    const cleanPin = String(pin).trim();
+
     // Clear any pending cleanup if room pin is reused
-    const existingRoom = rooms.get(pin);
+    const existingRoom = rooms.get(cleanPin);
     if (existingRoom && existingRoom.cleanupTimeout) {
       clearTimeout(existingRoom.cleanupTimeout);
       if (existingRoom.timerInterval) clearInterval(existingRoom.timerInterval);
@@ -208,7 +219,8 @@ io.on('connection', (socket) => {
     const hostToken = crypto.randomUUID();
     const actualHostId = hostId || socket.id;
 
-    rooms.set(pin, {
+    rooms.set(cleanPin, {
+      pin: cleanPin,
       hostSocket: socket.id,
       hostToken,
       hostId: actualHostId,
@@ -234,16 +246,17 @@ io.on('connection', (socket) => {
       cleanupTimeout: null
     });
     socket.playerId = actualHostId;
-    socket.roomPin = pin;
-    socket.join(pin);
+    socket.roomPin = cleanPin;
+    socket.join(cleanPin);
 
     // Provide persistent host credentials to the client so page refresh does not lock them out
-    socket.emit('hostCreated', { pin, hostToken, hostId: actualHostId });
-    broadcastState(pin);
+    socket.emit('hostCreated', { pin: cleanPin, hostToken, hostId: actualHostId });
+    broadcastState(cleanPin);
   });
 
   socket.on('reconnectHost', ({ pin, hostToken, hostId }) => {
-    const room = rooms.get(pin);
+    const cleanPin = String(pin || '').trim();
+    const room = rooms.get(cleanPin);
     if (!room) {
       socket.emit('error', 'Room not found or game has already ended.');
       return;
@@ -258,7 +271,7 @@ io.on('connection', (socket) => {
     if (room.cleanupTimeout) {
       clearTimeout(room.cleanupTimeout);
       room.cleanupTimeout = null;
-      console.log(`[Host Reconnect] Host reconnected to room ${pin}. Cleared cleanup timer.`);
+      console.log(`[Host Reconnect] Host reconnected to room ${cleanPin}. Cleared cleanup timer.`);
     }
 
     // Rebind host socket ID
@@ -273,14 +286,14 @@ io.on('connection', (socket) => {
       socket.playerId = hostId || room.hostId || socket.id;
     }
 
-    socket.roomPin = pin;
-    socket.join(pin);
+    socket.roomPin = cleanPin;
+    socket.join(cleanPin);
 
-    console.log(`[Host Reconnect] Room ${pin} host rebound to new socket ${socket.id}`);
+    console.log(`[Host Reconnect] Room ${cleanPin} host rebound to new socket ${socket.id}`);
 
     // Send complete host snapshot back to host
     socket.emit('hostReconnected', {
-      pin,
+      pin: cleanPin,
       state: room.state,
       currentQuestionIndex: room.currentQuestionIndex,
       timeRemaining: room.timeRemaining,
@@ -297,11 +310,12 @@ io.on('connection', (socket) => {
     });
 
     // Notify all players of updated room state
-    broadcastState(pin);
+    broadcastState(cleanPin);
   });
 
   socket.on('joinGame', ({ pin, nickname, playerId }) => {
-    const room = rooms.get(pin);
+    const cleanPin = String(pin || '').trim();
+    const room = rooms.get(cleanPin);
     if (!room || room.state !== 'LOBBY') {
       socket.emit('error', 'Room not found or game already started');
       return;
@@ -350,9 +364,9 @@ io.on('connection', (socket) => {
     }
 
     socket.playerId = actualPlayerId;
-    socket.roomPin = pin;
-    socket.join(pin);
-    broadcastState(pin);
+    socket.roomPin = cleanPin;
+    socket.join(cleanPin);
+    broadcastState(cleanPin);
   });
 
   function areAllPlayersAnswered(room) {
@@ -446,22 +460,32 @@ io.on('connection', (socket) => {
   }
 
   socket.on('startGame', ({ pin, hostToken }) => {
-    const room = rooms.get(pin);
-    if (isHostAuthorized(room, socket, hostToken)) {
-      room.currentQuestionIndex = 0;
-      room.state = 'QUESTION';
-      room.timeRemaining = room.questions[0]?.timeLimit || 20;
-      room.players.forEach(p => {
-        p.answeredCorrectly = false;
-        p.hasAnswered = false;
-      });
-      broadcastState(pin);
-      startQuestionTimer(pin);
+    const cleanPin = String(pin || socket.roomPin || '').trim();
+    const room = rooms.get(cleanPin);
+    if (!room) {
+      console.warn(`[StartGame] Room "${cleanPin}" not found.`);
+      socket.emit('error', 'Room not found or game has ended.');
+      return;
     }
+    if (!isHostAuthorized(room, socket, hostToken, cleanPin)) {
+      console.warn(`[StartGame] Unauthorized host attempt for room "${cleanPin}". Socket: ${socket.id}, room.hostSocket: ${room.hostSocket}`);
+      socket.emit('error', 'Unauthorized: You are not the authorized host for this room.');
+      return;
+    }
+    room.currentQuestionIndex = 0;
+    room.state = 'QUESTION';
+    room.timeRemaining = room.questions[0]?.timeLimit || 20;
+    room.players.forEach(p => {
+      p.answeredCorrectly = false;
+      p.hasAnswered = false;
+    });
+    broadcastState(cleanPin);
+    startQuestionTimer(cleanPin);
   });
 
   socket.on('submitAnswer', ({ pin, playerId, answerIndex }) => {
-    const room = rooms.get(pin);
+    const cleanPin = String(pin || socket.roomPin || '').trim();
+    const room = rooms.get(cleanPin);
     if (!room || room.state !== 'QUESTION') return;
 
     // Verify player exists in the room
@@ -513,37 +537,40 @@ io.on('connection', (socket) => {
 
     // Check if all active players have submitted their answers
     if (areAllPlayersAnswered(room)) {
-      onAllPlayersAnswered(pin);
+      onAllPlayersAnswered(cleanPin);
     } else {
-      broadcastState(pin);
+      broadcastState(cleanPin);
     }
   });
 
   socket.on('nextQuestion', ({ pin, hostToken }) => {
-    const room = rooms.get(pin);
-    if (isHostAuthorized(room, socket, hostToken)) {
-      advanceQuestion(pin);
+    const cleanPin = String(pin || socket.roomPin || '').trim();
+    const room = rooms.get(cleanPin);
+    if (isHostAuthorized(room, socket, hostToken, cleanPin)) {
+      advanceQuestion(cleanPin);
     }
   });
 
   // Host-only: immediately end the game mid-session
   socket.on('endGame', ({ pin, hostToken }) => {
-    const room = rooms.get(pin);
-    if (isHostAuthorized(room, socket, hostToken)) {
+    const cleanPin = String(pin || socket.roomPin || '').trim();
+    const room = rooms.get(cleanPin);
+    if (isHostAuthorized(room, socket, hostToken, cleanPin)) {
       if (room.timerInterval) clearInterval(room.timerInterval);
       if (room.autoAdvanceTimeout) clearTimeout(room.autoAdvanceTimeout);
       room.state = 'GAME_OVER';
       // Move to recentRooms for post-game Tutor
-      recentRooms.set(pin, { questions: room.questions });
-      setTimeout(() => recentRooms.delete(pin), 15 * 60 * 1000);
-      broadcastState(pin);
-      rooms.delete(pin);
+      recentRooms.set(cleanPin, { questions: room.questions });
+      setTimeout(() => recentRooms.delete(cleanPin), 15 * 60 * 1000);
+      broadcastState(cleanPin);
+      rooms.delete(cleanPin);
     }
   });
 
   socket.on('kickPlayer', ({ pin, targetPlayerId, hostToken }) => {
-    const room = rooms.get(pin);
-    if (isHostAuthorized(room, socket, hostToken)) {
+    const cleanPin = String(pin || socket.roomPin || '').trim();
+    const room = rooms.get(cleanPin);
+    if (isHostAuthorized(room, socket, hostToken, cleanPin)) {
       const targetIndex = room.players.findIndex(p => p.id === targetPlayerId);
       if (targetIndex !== -1) {
         const targetPlayer = room.players[targetIndex];
@@ -552,16 +579,17 @@ io.on('connection', (socket) => {
           io.to(targetPlayer.socketId).emit('kicked');
         }
         if (room.state === 'QUESTION' && areAllPlayersAnswered(room)) {
-          onAllPlayersAnswered(pin);
+          onAllPlayersAnswered(cleanPin);
         } else {
-          broadcastState(pin);
+          broadcastState(cleanPin);
         }
       }
     }
   });
 
   socket.on('editNickname', ({ pin, newNickname }) => {
-    const room = rooms.get(pin);
+    const cleanPin = String(pin || socket.roomPin || '').trim();
+    const room = rooms.get(cleanPin);
     if (room) {
       const cleanNickname = sanitizeNickname(newNickname);
       if (!cleanNickname) {
@@ -571,7 +599,7 @@ io.on('connection', (socket) => {
       const player = room.players.find(p => p.id === socket.playerId);
       if (player) {
         player.nickname = cleanNickname;
-        broadcastState(pin);
+        broadcastState(cleanPin);
       }
     }
   });

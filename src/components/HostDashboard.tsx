@@ -159,7 +159,7 @@ export function HostDashboard({
                 role="progressbar"
                 aria-valuenow={timeRemaining}
                 aria-valuemin={0}
-                aria-valuemax={question.timeLimit}
+                aria-valuemax={question?.timeLimit || 20}
                 className="h-3 rounded-full overflow-hidden bg-rim"
               >
                 <motion.div

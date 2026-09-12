@@ -39,6 +39,7 @@ export interface QuizSession {
   currentQuestionIndex: number;
   gameState: GameState;
   hostId: string;
+  totalQuestions?: number;
 }
 
 // ─── WebSocket Communication ────────────────────────────────────────────────

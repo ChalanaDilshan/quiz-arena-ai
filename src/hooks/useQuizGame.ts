@@ -190,6 +190,15 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
     }
   }, []);
 
+  const getStoredHostSession = useCallback((): StoredHostSession | null => {
+    try {
+      const raw = sessionStorage.getItem(HOST_SESSION_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }, []);
+
   const clearHostSession = useCallback(() => {
     try {
       sessionStorage.removeItem(HOST_SESSION_KEY);
@@ -321,6 +330,17 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
     socket.on('connect', () => {
       clearConnectionTimers();
       setError(prev => (prev?.includes('trying to connect') || prev?.includes('Unable to reach') ? null : prev));
+      // If socket reconnected while hosting, rebind room immediately
+      const stored = getStoredHostSession();
+      const token = hostTokenRef.current || stored?.hostToken;
+      const targetPin = pin || stored?.pin;
+      if (token && targetPin) {
+        socket.emit('reconnectHost', {
+          pin: targetPin,
+          hostToken: token,
+          hostId: stored?.hostId || playerId
+        });
+      }
     });
 
     socket.on('connect_error', (err) => {
@@ -338,7 +358,7 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
       }
       setGameState(state.state);
       setSession(prev => {
-        let questions = prev?.questions ? [...prev.questions] : [];
+        let questions = (prev?.questions && prev.questions.length > 0) ? [...prev.questions] : [];
         if (state.questions && state.state === 'GAME_OVER') {
           questions = state.questions;
         } else if (state.currentQuestion) {
@@ -353,7 +373,8 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
           currentQuestionIndex: state.currentQuestionIndex,
           players: state.players,
           questions,
-          gameState: state.state
+          gameState: state.state,
+          totalQuestions: state.totalQuestions || prev?.totalQuestions || questions.length || 0,
         };
       });
       setTimeRemaining(state.timeRemaining);
@@ -375,16 +396,20 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
 
     socket.on('hostReconnected', (data) => {
       setIsHost(true);
+      if (data.hostToken) {
+        hostTokenRef.current = data.hostToken;
+      }
       setGameState(data.state);
       setTimeRemaining(data.timeRemaining);
-      setSession({
+      setSession(prev => ({
         roomPin: data.pin,
         hostId: playerId,
         currentQuestionIndex: data.currentQuestionIndex,
         players: data.players,
-        questions: data.questions || [],
-        gameState: data.state
-      });
+        questions: (data.questions && data.questions.length > 0) ? data.questions : (prev?.questions || []),
+        gameState: data.state,
+        totalQuestions: data.questions?.length || prev?.totalQuestions || 0,
+      }));
       if (data.state === 'QUESTION') {
         setIsAnswerRevealed(false);
       } else if (data.state === 'LEADERBOARD' || data.state === 'GAME_OVER') {
@@ -401,12 +426,13 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
       setError('You have been kicked by the host.');
       resetGame();
     });
-  }, [resetGame, saveHostSession, playerId, clearConnectionTimers, startConnectionTimers, updateIsJoining]);
+  }, [resetGame, saveHostSession, getStoredHostSession, playerId, clearConnectionTimers, startConnectionTimers, updateIsJoining]);
 
   // ── Actions ────────────────────────────────────────────────────────────
 
   const kickPlayer = useCallback((targetPlayerId: string) => {
-    if (!session || !isHost) return;
+    const pin = session?.roomPin || getStoredHostSession()?.pin;
+    if (!pin || !isHost) return;
     if (useMockMode) {
       setSession(prev => {
         if (!prev) return null;
@@ -416,13 +442,14 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
         };
       });
     } else {
+      const token = hostTokenRef.current || getStoredHostSession()?.hostToken;
       socketRef.current?.emit('kickPlayer', {
-        pin: session.roomPin,
+        pin,
         targetPlayerId,
-        hostToken: hostTokenRef.current
+        hostToken: token
       });
     }
-  }, [session, isHost, useMockMode]);
+  }, [session, isHost, useMockMode, getStoredHostSession]);
 
   const editNickname = useCallback((newNickname: string) => {
     if (!session) return;
@@ -570,10 +597,32 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
         }
       }
 
-      const launchGame = (data: { topic?: string; questions: Question[] }) => {
+      const launchGame = (data: { topic?: string; questions: Question[]; isFallback?: boolean }) => {
         setUploadProgress(100);
         const generatedQuestions: Question[] = data.questions;
         const pin = generatePin();
+
+        // Immediately establish local session and lobby state with questions
+        const initialSession: QuizSession = {
+          roomPin: pin,
+          questions: generatedQuestions,
+          players: [{
+            id: playerId,
+            nickname: 'Host',
+            score: 0,
+            streak: 0,
+            avatarColor: '#D15836',
+            isHost: true,
+            hasAnswered: false,
+          }],
+          currentQuestionIndex: 0,
+          gameState: 'LOBBY',
+          hostId: playerId,
+          totalQuestions: generatedQuestions.length,
+        };
+        setSession(initialSession);
+        setGameState('LOBBY');
+        setIsHost(true);
 
         try {
           const socket = io(url);
@@ -581,18 +630,23 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
           startConnectionTimers();
           setupSocketListeners(socket, pin);
 
-          socket.on('connect', () => {
+          const emitHostGame = () => {
             socket.emit('hostGame', {
               pin,
               quizData: {
                 topic: data.topic || topicName,
                 questions: generatedQuestions,
+                isFallback: Boolean(data.isFallback),
               },
               hostId: playerId,
             });
-          });
+          };
 
-          setIsHost(true);
+          if (socket.connected) {
+            emitHostGame();
+          } else {
+            socket.once('connect', emitHostGame);
+          }
         } catch {
           clearConnectionTimers();
           setError('Could not connect to live game server.');
@@ -700,6 +754,7 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
           currentQuestionIndex: 0,
           gameState: 'LOBBY',
           hostId: playerId,
+          totalQuestions: quiz.questions.length,
         };
         saveHostSession({
           pin,
@@ -715,6 +770,27 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
       }
 
       // Live mode
+      const initialSession: QuizSession = {
+        roomPin: pin,
+        questions: quiz.questions,
+        players: [{
+          id: playerId,
+          nickname: 'Host',
+          score: 0,
+          streak: 0,
+          avatarColor: '#D15836',
+          isHost: true,
+          hasAnswered: false,
+        }],
+        currentQuestionIndex: 0,
+        gameState: 'LOBBY',
+        hostId: playerId,
+        totalQuestions: quiz.questions.length,
+      };
+      setSession(initialSession);
+      setIsHost(true);
+      setGameState('LOBBY');
+
       try {
         const url = getApiUrl();
         const socket = io(url);
@@ -723,11 +799,15 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
         startConnectionTimers();
         setupSocketListeners(socket, pin);
 
-        socket.on('connect', () => {
+        const emitHostGame = () => {
           socket.emit('hostGame', { pin, quizData: quiz, hostId: playerId });
-        });
-        
-        setIsHost(true);
+        };
+
+        if (socket.connected) {
+          emitHostGame();
+        } else {
+          socket.once('connect', emitHostGame);
+        }
       } catch {
         clearConnectionTimers();
         setError('Could not connect to game server.');
@@ -737,26 +817,35 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
   );
 
   const startGame = useCallback(() => {
-    if (!session) return;
+    const targetPin = session?.roomPin || getStoredHostSession()?.pin;
+    if (!targetPin) {
+      console.warn('[useQuizGame] startGame: No active room PIN found.');
+      return;
+    }
     
     if (useMockMode) {
+      if (!session) return;
       setSession(prev => (prev ? { ...prev, gameState: 'QUESTION', currentQuestionIndex: 0 } : null));
       setSelectedAnswer(null);
       setIsAnswerRevealed(false);
       setGameState('QUESTION');
       startTimer(session.questions[0]?.timeLimit ?? 20);
     } else {
+      const token = hostTokenRef.current || getStoredHostSession()?.hostToken;
+      console.log(`[useQuizGame] Emitting startGame for room ${targetPin} with token: ${Boolean(token)}`);
       socketRef.current?.emit('startGame', {
-        pin: session.roomPin,
-        hostToken: hostTokenRef.current
+        pin: targetPin,
+        hostToken: token
       });
     }
-  }, [session, startTimer, useMockMode]);
+  }, [session, startTimer, useMockMode, getStoredHostSession]);
 
   const nextQuestion = useCallback(() => {
-    if (!session || (gameState !== 'LEADERBOARD' && gameState !== 'QUESTION')) return;
+    const pin = session?.roomPin || getStoredHostSession()?.pin;
+    if (!pin || (gameState !== 'LEADERBOARD' && gameState !== 'QUESTION')) return;
 
     if (useMockMode) {
+      if (!session) return;
       const nextIdx = session.currentQuestionIndex + 1;
       if (nextIdx >= session.questions.length) {
         setGameState('GAME_OVER');
@@ -768,13 +857,14 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
         startTimer(session.questions[nextIdx]?.timeLimit ?? 20);
       }
     } else {
+      const token = hostTokenRef.current || getStoredHostSession()?.hostToken;
       socketRef.current?.emit('nextQuestion', {
-        pin: session.roomPin,
-        hostToken: hostTokenRef.current
+        pin,
+        hostToken: token
       });
       setSelectedAnswer(null); // Reset selection
     }
-  }, [session, gameState, startTimer, useMockMode]);
+  }, [session, gameState, startTimer, useMockMode, getStoredHostSession]);
 
   const submitAnswer = useCallback(
     (answerIndex: number) => {
@@ -836,17 +926,19 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
 
   /** Host-only: immediately end the current game and move everyone to GAME_OVER */
   const stopGame = useCallback(() => {
-    if (!session || !isHost) return;
+    const pin = session?.roomPin || getStoredHostSession()?.pin;
+    if (!pin || !isHost) return;
     clearTimer();
     if (useMockMode) {
       setGameState('GAME_OVER');
     } else {
+      const token = hostTokenRef.current || getStoredHostSession()?.hostToken;
       socketRef.current?.emit('endGame', {
-        pin: session.roomPin,
-        hostToken: hostTokenRef.current
+        pin,
+        hostToken: token
       });
     }
-  }, [session, isHost, clearTimer, useMockMode]);
+  }, [session, isHost, clearTimer, useMockMode, getStoredHostSession]);
 
 
   // ── Hint Master ────────────────────────────────────────────────────────

@@ -277,4 +277,36 @@ test('Gateway Test Suite', async (t) => {
     assert.equal(state.isFallback, true, 'gameStateUpdate must include isFallback: true');
     socket.disconnect();
   });
+
+  await t.test('startGame succeeds and joins room channel even if host socket reconnected without reconnectHost', async () => {
+    const socket1 = await connectSocket();
+    const pin = '334455';
+    const mockQuiz = {
+      topic: 'Reconnect StartGame Test',
+      questions: [
+        { id: '1', text: 'Q1', options: ['A', 'B'], correctIndex: 0, timeLimit: 20 },
+      ],
+    };
+
+    const hostCreatedPromise = new Promise((resolve) => socket1.on('hostCreated', resolve));
+    socket1.emit('hostGame', { pin, quizData: mockQuiz, hostId: 'host-recon-start' });
+    const { hostToken } = await hostCreatedPromise;
+    socket1.disconnect();
+
+    // Host connects on a fresh socket (e.g. network blip on EC2) and hasn't called reconnectHost yet
+    const socket2 = await connectSocket();
+
+    const gameStartedPromise = new Promise((resolve) => {
+      socket2.on('gameStateUpdate', (s) => {
+        if (s.state === 'QUESTION') resolve(s);
+      });
+    });
+
+    socket2.emit('startGame', { pin, hostToken });
+    const questionState = await gameStartedPromise;
+    assert.equal(questionState.state, 'QUESTION');
+    assert.equal(questionState.totalQuestions, 1);
+
+    socket2.disconnect();
+  });
 });

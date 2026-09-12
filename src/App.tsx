@@ -161,7 +161,7 @@ function App() {
               gameState={game.gameState}
               question={game.currentQuestion}
               questionNumber={(game.session?.currentQuestionIndex ?? 0) + 1}
-              totalQuestions={game.session?.questions.length ?? 0}
+              totalQuestions={game.session?.totalQuestions || (game.session?.questions.length ?? 0)}
               timeRemaining={game.timeRemaining}
               isAnswerRevealed={game.isAnswerRevealed}
               players={game.players}
@@ -175,7 +175,7 @@ function App() {
           <QuestionView
             question={game.currentQuestion}
             questionNumber={(game.session?.currentQuestionIndex ?? 0) + 1}
-            totalQuestions={game.session?.questions.length ?? 0}
+            totalQuestions={game.session?.totalQuestions || (game.session?.questions.length ?? 0)}
             timeRemaining={game.timeRemaining}
             selectedAnswer={game.selectedAnswer}
             isAnswerRevealed={game.isAnswerRevealed}
@@ -196,7 +196,7 @@ function App() {
               gameState={game.gameState}
               question={game.currentQuestion}
               questionNumber={(game.session?.currentQuestionIndex ?? 0) + 1}
-              totalQuestions={game.session?.questions.length ?? 0}
+              totalQuestions={game.session?.totalQuestions || (game.session?.questions.length ?? 0)}
               timeRemaining={game.timeRemaining}
               isAnswerRevealed={game.isAnswerRevealed}
               players={game.players}
@@ -210,7 +210,7 @@ function App() {
           <LeaderboardView
             players={game.players}
             currentQuestionIndex={game.session?.currentQuestionIndex ?? 0}
-            totalQuestions={game.session?.questions.length ?? 0}
+            totalQuestions={game.session?.totalQuestions || (game.session?.questions.length ?? 0)}
             isHost={game.isHost}
             playerId={game.playerId}
             onNextQuestion={game.nextQuestion}
