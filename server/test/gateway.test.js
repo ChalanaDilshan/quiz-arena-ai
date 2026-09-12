@@ -204,4 +204,55 @@ test('Gateway Test Suite', async (t) => {
 
     socket.disconnect();
   });
+
+  await t.test('submitAnswer immediately transitions to LEADERBOARD and updates score when all players answer', async () => {
+    const hostSocket = await connectSocket();
+    const pin = '778899';
+    const mockQuiz = {
+      topic: 'Immediate Transition Test',
+      questions: [
+        { id: '1', text: 'What is 5+5?', options: ['10', '20'], correctIndex: 0, timeLimit: 20 },
+        { id: '2', text: 'What is 3+3?', options: ['6', '9'], correctIndex: 0, timeLimit: 20 },
+      ],
+    };
+
+    const hostCreatedPromise = new Promise((res) => hostSocket.on('hostCreated', res));
+    hostSocket.emit('hostGame', { pin, quizData: mockQuiz, hostId: 'host-quick' });
+    const { hostToken } = await hostCreatedPromise;
+
+    const playerSocket = await connectSocket();
+    const joinedPromise = new Promise((res) => {
+      playerSocket.on('gameStateUpdate', (s) => {
+        if (s.state === 'LOBBY' && s.players.some(p => p.id === 'player-quick')) res(s);
+      });
+    });
+    playerSocket.emit('joinGame', { pin, nickname: 'QuickPlayer', playerId: 'player-quick' });
+    await joinedPromise;
+
+    const questionPromise = new Promise((res) => {
+      playerSocket.on('gameStateUpdate', (s) => {
+        if (s.state === 'QUESTION') res(s);
+      });
+    });
+    hostSocket.emit('startGame', { pin, hostToken });
+    await questionPromise;
+
+    // Player submits answer
+    const leaderboardPromise = new Promise((res) => {
+      playerSocket.on('gameStateUpdate', (s) => {
+        if (s.state === 'LEADERBOARD') res(s);
+      });
+    });
+
+    playerSocket.emit('submitAnswer', { pin, playerId: 'player-quick', answerIndex: 0 });
+    const leaderboardState = await leaderboardPromise;
+
+    assert.equal(leaderboardState.state, 'LEADERBOARD');
+    const playerInLb = leaderboardState.players.find(p => p.id === 'player-quick');
+    assert.ok(playerInLb.score > 0, 'Score should be updated immediately');
+    assert.equal(leaderboardState.currentQuestion.correctIndex, 0, 'correctIndex revealed in LEADERBOARD');
+
+    hostSocket.disconnect();
+    playerSocket.disconnect();
+  });
 });

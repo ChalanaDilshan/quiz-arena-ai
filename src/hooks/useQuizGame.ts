@@ -360,6 +360,7 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
       
       if (state.state === 'QUESTION') {
         setIsAnswerRevealed(false);
+        setSelectedAnswer(null);
       }
       if (state.state === 'LEADERBOARD' || state.state === 'GAME_OVER') {
         setIsAnswerRevealed(true);
@@ -752,6 +753,29 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
     }
   }, [session, startTimer, useMockMode]);
 
+  const nextQuestion = useCallback(() => {
+    if (!session || (gameState !== 'LEADERBOARD' && gameState !== 'QUESTION')) return;
+
+    if (useMockMode) {
+      const nextIdx = session.currentQuestionIndex + 1;
+      if (nextIdx >= session.questions.length) {
+        setGameState('GAME_OVER');
+      } else {
+        setSession(prev => (prev ? { ...prev, currentQuestionIndex: nextIdx } : null));
+        setSelectedAnswer(null);
+        setIsAnswerRevealed(false);
+        setGameState('QUESTION');
+        startTimer(session.questions[nextIdx]?.timeLimit ?? 20);
+      }
+    } else {
+      socketRef.current?.emit('nextQuestion', {
+        pin: session.roomPin,
+        hostToken: hostTokenRef.current
+      });
+      setSelectedAnswer(null); // Reset selection
+    }
+  }, [session, gameState, startTimer, useMockMode]);
+
   const submitAnswer = useCallback(
     (answerIndex: number) => {
       if (selectedAnswer !== null || isAnswerRevealed) return;
@@ -792,40 +816,23 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
           };
         });
 
-        // Brief pause then reveal the correct answer
+        // Brief pause then reveal the correct answer and leaderboard
         setTimeout(() => {
           setIsAnswerRevealed(true);
           clearTimer();
+          setGameState('LEADERBOARD');
+
+          // Auto-advance in mock mode after 2.5s
+          setTimeout(() => {
+            nextQuestion();
+          }, 2500);
         }, 500);
       } else {
         socketRef.current?.emit('submitAnswer', { pin: session?.roomPin, playerId, answerIndex });
       }
     },
-    [selectedAnswer, currentQuestion, isAnswerRevealed, timeRemaining, playerId, calculateScore, clearTimer, useMockMode, session],
+    [selectedAnswer, currentQuestion, isAnswerRevealed, timeRemaining, playerId, calculateScore, clearTimer, useMockMode, session, nextQuestion],
   );
-
-  const nextQuestion = useCallback(() => {
-    if (!session || gameState !== 'LEADERBOARD') return;
-
-    if (useMockMode) {
-      const nextIdx = session.currentQuestionIndex + 1;
-      if (nextIdx >= session.questions.length) {
-        setGameState('GAME_OVER');
-      } else {
-        setSession(prev => (prev ? { ...prev, currentQuestionIndex: nextIdx } : null));
-        setSelectedAnswer(null);
-        setIsAnswerRevealed(false);
-        setGameState('QUESTION');
-        startTimer(session.questions[nextIdx]?.timeLimit ?? 20);
-      }
-    } else {
-      socketRef.current?.emit('nextQuestion', {
-        pin: session.roomPin,
-        hostToken: hostTokenRef.current
-      });
-      setSelectedAnswer(null); // Reset selection
-    }
-  }, [session, gameState, startTimer, useMockMode]);
 
   /** Host-only: immediately end the current game and move everyone to GAME_OVER */
   const stopGame = useCallback(() => {

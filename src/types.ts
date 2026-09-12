@@ -23,6 +23,7 @@ export interface Player {
   streak: number;          // Consecutive correct answers
   avatarColor: string;     // Hex color for avatar badge
   isHost: boolean;
+  hasAnswered?: boolean;
   lastAnswerCorrect?: boolean;
   lastScoreDelta?: number; // Points earned on the most recent question
   correctCount?: number;   // Total correct answers for analytics report

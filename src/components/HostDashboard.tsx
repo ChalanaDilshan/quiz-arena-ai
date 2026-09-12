@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Trophy, Clock, Users, SkipForward, StopCircle, TrendingUp,
@@ -368,11 +368,11 @@ export function HostDashboard({
                   {isLast ? 'See Final Results' : 'Next Question'}
                   {!isLast && <SkipForward className="w-4 h-4 ml-1" />}
                 </motion.button>
-                {!isLast && (
-                  <p className="text-xs text-center text-smoke">
-                    {totalQuestions - questionNumber} question{totalQuestions - questionNumber !== 1 ? 's' : ''} remaining
-                  </p>
-                )}
+                <p className="text-xs text-center text-smoke">
+                  {isLast
+                    ? 'Moving to final results… or click button above'
+                    : `Auto-advancing to question ${questionNumber + 1}… or click Next`}
+                </p>
               </motion.div>
             )}
           </AnimatePresence>
@@ -381,18 +381,36 @@ export function HostDashboard({
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="card rounded-2xl px-5 py-4 flex items-start gap-3"
+              className="card rounded-2xl px-5 py-4 flex flex-col gap-3"
             >
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                style={{ background: 'rgba(209,88,54,0.12)' }}>
-                <TrendingUp className="w-4 h-4" style={{ color: 'var(--color-sienna)' }} />
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                  style={{ background: 'rgba(209,88,54,0.12)' }}>
+                  <TrendingUp className="w-4 h-4" style={{ color: 'var(--color-sienna)' }} />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-alabaster mb-0.5">Question in Progress</p>
+                  <p className="text-xs text-smoke leading-relaxed">
+                    {activePlayers.length === 0
+                      ? 'Waiting for players…'
+                      : (activePlayers.filter(p => p.hasAnswered).length >= activePlayers.length)
+                        ? 'All players have answered! Updating leaderboard…'
+                        : `${activePlayers.filter(p => p.hasAnswered).length} of ${activePlayers.length} player${activePlayers.length !== 1 ? 's' : ''} answered. Advances immediately when all answer.`}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-xs font-bold text-alabaster mb-0.5">Question in Progress</p>
-                <p className="text-xs text-smoke leading-relaxed">
-                  Players are answering now. Leaderboard updates when time expires.
-                </p>
-              </div>
+
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={onNextQuestion}
+                id="host-skip-question-btn"
+                aria-label={isLast ? 'End & See Results' : 'Skip to Next Question'}
+                className="btn-secondary w-full justify-center !py-2 text-xs font-semibold"
+              >
+                {isLast ? 'End & See Results' : 'Skip to Next Question'}
+                <SkipForward className="w-3.5 h-3.5 ml-1" />
+              </motion.button>
             </motion.div>
           )}
         </motion.aside>

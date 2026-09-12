@@ -144,7 +144,10 @@ function broadcastState(pin) {
       wrongStreak: p.wrongStreak,
       correctCount: p.correctCount || 0,
       answersGiven: p.answersGiven || 0,
-      isHost: p.isHost
+      isHost: p.isHost,
+      hasAnswered: !!p.hasAnswered,
+      lastAnswerCorrect: room.state !== 'QUESTION' ? p.lastAnswerCorrect : undefined,
+      lastScoreDelta: room.state !== 'QUESTION' ? p.lastScoreDelta : undefined,
     })),
     // Anti-Cheating: Strip correctIndex and explanation while question is live.
     // Reveal full question only during LEADERBOARD and GAME_OVER.
@@ -198,6 +201,7 @@ io.on('connection', (socket) => {
     if (existingRoom && existingRoom.cleanupTimeout) {
       clearTimeout(existingRoom.cleanupTimeout);
       if (existingRoom.timerInterval) clearInterval(existingRoom.timerInterval);
+      if (existingRoom.autoAdvanceTimeout) clearTimeout(existingRoom.autoAdvanceTimeout);
     }
 
     const hostToken = crypto.randomUUID();
@@ -224,6 +228,7 @@ io.on('connection', (socket) => {
       state: 'LOBBY',
       timeRemaining: 20,
       timerInterval: null,
+      autoAdvanceTimeout: null,
       cleanupTimeout: null
     });
     socket.playerId = actualHostId;
@@ -348,9 +353,100 @@ io.on('connection', (socket) => {
     broadcastState(pin);
   });
 
+  function areAllPlayersAnswered(room) {
+    const nonHostPlayers = room.players.filter(p => !p.isHost);
+    if (nonHostPlayers.length === 0) {
+      return room.players.every(p => p.hasAnswered);
+    }
+    return nonHostPlayers.every(p => p.hasAnswered);
+  }
+
+  function startQuestionTimer(pin) {
+    const room = rooms.get(pin);
+    if (!room) return;
+
+    if (room.timerInterval) clearInterval(room.timerInterval);
+    if (room.autoAdvanceTimeout) clearTimeout(room.autoAdvanceTimeout);
+
+    room.timerInterval = setInterval(() => {
+      const r = rooms.get(pin);
+      if (r && r.state === 'QUESTION') {
+        r.timeRemaining -= 1;
+        if (r.timeRemaining <= 0) {
+          clearInterval(r.timerInterval);
+          r.timerInterval = null;
+          r.state = 'LEADERBOARD';
+          broadcastState(pin);
+
+          // Auto-advance to next question or final results after 2.5s
+          if (r.autoAdvanceTimeout) clearTimeout(r.autoAdvanceTimeout);
+          r.autoAdvanceTimeout = setTimeout(() => {
+            advanceQuestion(pin);
+          }, 2500);
+        } else {
+          broadcastState(pin);
+        }
+      }
+    }, 1000);
+  }
+
+  function onAllPlayersAnswered(pin) {
+    const room = rooms.get(pin);
+    if (!room || room.state !== 'QUESTION') return;
+
+    // Immediately stop the 20s question timer & reveal leaderboard
+    if (room.timerInterval) {
+      clearInterval(room.timerInterval);
+      room.timerInterval = null;
+    }
+    room.timeRemaining = 0;
+    room.state = 'LEADERBOARD';
+    broadcastState(pin);
+
+    // Auto-advance to next question or final results after a brief 2-second reveal
+    if (room.autoAdvanceTimeout) clearTimeout(room.autoAdvanceTimeout);
+    room.autoAdvanceTimeout = setTimeout(() => {
+      advanceQuestion(pin);
+    }, 2000);
+  }
+
+  function advanceQuestion(pin) {
+    const room = rooms.get(pin);
+    if (!room || (room.state !== 'QUESTION' && room.state !== 'LEADERBOARD')) return;
+
+    if (room.autoAdvanceTimeout) {
+      clearTimeout(room.autoAdvanceTimeout);
+      room.autoAdvanceTimeout = null;
+    }
+    if (room.timerInterval) {
+      clearInterval(room.timerInterval);
+      room.timerInterval = null;
+    }
+
+    if (room.currentQuestionIndex < room.questions.length - 1) {
+      room.currentQuestionIndex += 1;
+      room.state = 'QUESTION';
+      room.timeRemaining = room.questions[room.currentQuestionIndex]?.timeLimit || 20;
+      room.players.forEach(p => {
+        p.answeredCorrectly = false;
+        p.hasAnswered = false;
+      });
+      broadcastState(pin);
+      startQuestionTimer(pin);
+    } else {
+      room.state = 'GAME_OVER';
+      recentRooms.set(pin, { questions: room.questions });
+      setTimeout(() => recentRooms.delete(pin), 15 * 60 * 1000); // clear after 15m
+
+      broadcastState(pin);
+      rooms.delete(pin); // cleanup active room
+    }
+  }
+
   socket.on('startGame', ({ pin, hostToken }) => {
     const room = rooms.get(pin);
     if (isHostAuthorized(room, socket, hostToken)) {
+      room.currentQuestionIndex = 0;
       room.state = 'QUESTION';
       room.timeRemaining = room.questions[0]?.timeLimit || 20;
       room.players.forEach(p => {
@@ -358,21 +454,7 @@ io.on('connection', (socket) => {
         p.hasAnswered = false;
       });
       broadcastState(pin);
-      
-      // Simple timer
-      if (room.timerInterval) clearInterval(room.timerInterval);
-      room.timerInterval = setInterval(() => {
-        const r = rooms.get(pin);
-        if (r && r.state === 'QUESTION') {
-          r.timeRemaining -= 1;
-          if (r.timeRemaining <= 0) {
-            r.state = 'LEADERBOARD';
-            broadcastState(pin);
-          } else {
-            broadcastState(pin);
-          }
-        }
-      }, 1000);
+      startQuestionTimer(pin);
     }
   });
 
@@ -405,8 +487,11 @@ io.on('connection', (socket) => {
     }
 
     const correctIndex = currentQ ? currentQ.correctIndex : room.questions[room.currentQuestionIndex]?.correctIndex;
-    if (answerIndex === correctIndex) {
-      player.score += (room.timeRemaining * 10);
+    const isCorrect = (answerIndex === correctIndex);
+    let delta = 0;
+    if (isCorrect) {
+      delta = (room.timeRemaining * 10);
+      player.score += delta;
       player.streak += 1;
       player.wrongStreak = 0;
       player.answeredCorrectly = true;
@@ -419,33 +504,23 @@ io.on('connection', (socket) => {
       player.wrongStreak += 1;
       player.answeredCorrectly = false;
     }
+    player.lastAnswerCorrect = isCorrect;
+    player.lastScoreDelta = delta;
+
     socket.emit('answerAcknowledged', { answerIndex });
-    broadcastState(pin);
+
+    // Check if all active players have submitted their answers
+    if (areAllPlayersAnswered(room)) {
+      onAllPlayersAnswered(pin);
+    } else {
+      broadcastState(pin);
+    }
   });
 
   socket.on('nextQuestion', ({ pin, hostToken }) => {
     const room = rooms.get(pin);
     if (isHostAuthorized(room, socket, hostToken)) {
-      if (room.currentQuestionIndex < room.questions.length - 1) {
-        room.currentQuestionIndex += 1;
-        room.state = 'QUESTION';
-        room.timeRemaining = room.questions[room.currentQuestionIndex].timeLimit || 20;
-        room.players.forEach(p => {
-          p.answeredCorrectly = false;
-          p.hasAnswered = false;
-        });
-        broadcastState(pin);
-      } else {
-        room.state = 'GAME_OVER';
-        if (room.timerInterval) clearInterval(room.timerInterval);
-        
-        // Move to recentRooms for post-game Tutor
-        recentRooms.set(pin, { questions: room.questions });
-        setTimeout(() => recentRooms.delete(pin), 15 * 60 * 1000); // clear after 15m
-        
-        broadcastState(pin);
-        rooms.delete(pin); // cleanup active room
-      }
+      advanceQuestion(pin);
     }
   });
 
@@ -454,6 +529,7 @@ io.on('connection', (socket) => {
     const room = rooms.get(pin);
     if (isHostAuthorized(room, socket, hostToken)) {
       if (room.timerInterval) clearInterval(room.timerInterval);
+      if (room.autoAdvanceTimeout) clearTimeout(room.autoAdvanceTimeout);
       room.state = 'GAME_OVER';
       // Move to recentRooms for post-game Tutor
       recentRooms.set(pin, { questions: room.questions });
@@ -473,7 +549,11 @@ io.on('connection', (socket) => {
         if (targetPlayer.socketId) {
           io.to(targetPlayer.socketId).emit('kicked');
         }
-        broadcastState(pin);
+        if (room.state === 'QUESTION' && areAllPlayersAnswered(room)) {
+          onAllPlayersAnswered(pin);
+        } else {
+          broadcastState(pin);
+        }
       }
     }
   });
