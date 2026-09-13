@@ -157,15 +157,21 @@ export function QuestionEditorModal({
   const currentQ = questions[activeIdx] || questions[0];
 
   const content = (
-    <div className={`flex flex-col ${isEmbedded ? 'w-full' : 'max-h-[88vh]'} overflow-hidden`}>
+    <div
+      className={`flex flex-col ${isEmbedded ? 'w-full' : 'max-h-[88vh]'} overflow-hidden`}
+      style={{ backgroundColor: 'var(--color-elevated)' }}
+    >
       {/* ── Header ─────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-rim bg-card/60 flex-shrink-0">
+      <div
+        className="flex items-center justify-between px-6 py-4 border-b border-rim flex-shrink-0"
+        style={{ backgroundColor: 'var(--color-elevated)' }}
+      >
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 bg-sienna/15 border border-sienna/30">
             <Sparkles className="w-5 h-5 text-sienna" />
           </div>
           <div className="min-w-0">
-            <h2 className="text-base font-bold text-alabaster truncate">{title}</h2>
+            <h2 id="question-editor-title" className="text-base font-bold text-alabaster truncate">{title}</h2>
             <p className="text-xs text-smoke truncate">
               {topic ? `${topic} · ` : ''}{questions.length} questions in this quiz
             </p>
@@ -178,7 +184,7 @@ export function QuestionEditorModal({
               type="button"
               onClick={onClose}
               aria-label="Close question editor"
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-smoke hover:text-alabaster hover:bg-white/10 transition-colors"
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-smoke hover:text-alabaster hover:bg-white/10 transition-colors cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -205,7 +211,10 @@ export function QuestionEditorModal({
       <div className="flex-1 grid grid-cols-1 md:grid-cols-12 min-h-0 overflow-hidden divide-y md:divide-y-0 md:divide-x divide-rim">
         
         {/* Left Column: Question Navigator */}
-        <div className="md:col-span-4 p-4 overflow-y-auto max-h-[350px] md:max-h-[560px] space-y-2 bg-canvas/30">
+        <div
+          className="md:col-span-4 p-4 overflow-y-auto max-h-[350px] md:max-h-[560px] space-y-2 border-r border-rim"
+          style={{ backgroundColor: 'var(--color-canvas)' }}
+        >
           <div className="flex items-center justify-between mb-2">
             <span className="text-[11px] font-bold text-smoke uppercase tracking-wider">
               Question Navigator ({questions.length})
@@ -213,7 +222,7 @@ export function QuestionEditorModal({
             <button
               type="button"
               onClick={handleAddQuestion}
-              className="text-xs font-semibold text-sienna hover:text-sienna-hover flex items-center gap-1 py-1 px-2 rounded-md hover:bg-sienna/10 transition-colors"
+              className="text-xs font-semibold text-sienna hover:text-sienna-hover flex items-center gap-1 py-1 px-2 rounded-md hover:bg-sienna/10 transition-colors cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
               Add
@@ -228,25 +237,33 @@ export function QuestionEditorModal({
                   key={q.id || idx}
                   type="button"
                   onClick={() => { setActiveIdx(idx); setValidationError(null); }}
-                  className={`w-full text-left p-3 rounded-xl transition-all border flex items-start gap-2.5 ${
-                    isCurrent
-                      ? 'bg-sienna/15 border-sienna/50 text-alabaster shadow-sm'
-                      : 'bg-card/40 border-rim/60 hover:bg-card/80 text-smoke hover:text-alabaster'
-                  }`}
+                  className="w-full text-left p-3 rounded-xl transition-all border flex items-start gap-2.5 cursor-pointer"
+                  style={{
+                    backgroundColor: isCurrent ? 'var(--color-sienna-wash)' : 'var(--color-elevated)',
+                    borderColor: isCurrent ? 'var(--color-sienna)' : 'var(--color-rim)',
+                    boxShadow: isCurrent ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
+                  }}
                 >
-                  <span className={`w-5 h-5 rounded-md flex items-center justify-center text-[11px] font-bold flex-shrink-0 ${
-                    isCurrent ? 'bg-sienna text-white' : 'bg-rim/60 text-smoke'
-                  }`}>
+                  <span
+                    className="w-5 h-5 rounded-md flex items-center justify-center text-[11px] font-bold flex-shrink-0"
+                    style={{
+                      backgroundColor: isCurrent ? 'var(--color-sienna)' : 'var(--color-rim)',
+                      color: isCurrent ? '#FFFFFF' : 'var(--color-smoke)',
+                    }}
+                  >
                     {idx + 1}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium line-clamp-2 leading-snug">
+                    <p
+                      className="text-xs font-medium line-clamp-2 leading-snug"
+                      style={{ color: isCurrent ? 'var(--color-alabaster)' : 'var(--color-alabaster)' }}
+                    >
                       {q.text || <span className="italic text-smoke/60">Empty question</span>}
                     </p>
-                    <div className="flex items-center gap-2 mt-1.5 text-[10px] text-smoke/70">
+                    <div className="flex items-center gap-2 mt-1.5 text-[10px] text-smoke">
                       <span>{q.options.length} options</span>
                       <span>·</span>
-                      <span className="text-emerald-400 font-semibold">Ans: {SHAPES[q.correctIndex]?.label || 'A'}</span>
+                      <span className="text-emerald-500 font-semibold">Ans: {SHAPES[q.correctIndex]?.label || 'A'}</span>
                     </div>
                   </div>
                 </button>
@@ -256,7 +273,10 @@ export function QuestionEditorModal({
         </div>
 
         {/* Right Column: Question Editor Form */}
-        <div className="md:col-span-8 p-5 overflow-y-auto max-h-[500px] md:max-h-[560px] space-y-5 bg-card/20">
+        <div
+          className="md:col-span-8 p-5 overflow-y-auto max-h-[500px] md:max-h-[560px] space-y-5"
+          style={{ backgroundColor: 'var(--color-elevated)' }}
+        >
           {currentQ ? (
             <>
               {/* Question Header Row: Title & Actions */}
@@ -270,16 +290,24 @@ export function QuestionEditorModal({
 
                 <div className="flex items-center gap-2">
                   {/* Time limit picker */}
-                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-canvas border border-rim text-xs text-smoke">
+                  <div
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs text-smoke"
+                    style={{ backgroundColor: 'var(--color-canvas)', borderColor: 'var(--color-rim)' }}
+                  >
                     <Clock className="w-3.5 h-3.5 text-smoke" />
                     <select
                       value={currentQ.timeLimit || 20}
                       onChange={e => handleTimeLimitChange(activeIdx, Number(e.target.value))}
                       className="bg-transparent text-alabaster text-xs font-semibold focus:outline-none cursor-pointer"
                       aria-label="Time limit per question in seconds"
+                      style={{ color: 'var(--color-alabaster)' }}
                     >
                       {TIME_LIMITS.map(t => (
-                        <option key={t} value={t} className="bg-canvas text-alabaster">
+                        <option
+                          key={t}
+                          value={t}
+                          style={{ backgroundColor: 'var(--color-elevated)', color: 'var(--color-alabaster)' }}
+                        >
                           {t}s
                         </option>
                       ))}
@@ -292,7 +320,7 @@ export function QuestionEditorModal({
                     onClick={() => handleDeleteQuestion(activeIdx)}
                     disabled={questions.length <= 1}
                     aria-label={`Delete question ${activeIdx + 1}`}
-                    className="p-1.5 rounded-lg border border-rim/80 hover:border-red-500/40 text-smoke hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-30 disabled:pointer-events-none"
+                    className="p-1.5 rounded-lg border border-rim/80 hover:border-red-500/40 text-smoke hover:text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
                     title={questions.length <= 1 ? "Cannot delete the only question" : "Delete question"}
                   >
                     <Trash2 className="w-4 h-4" />
@@ -309,8 +337,13 @@ export function QuestionEditorModal({
                   value={currentQ.text}
                   onChange={e => handleTextChange(activeIdx, e.target.value)}
                   placeholder="Enter the question prompt..."
-                  rows={2}
-                  className="w-full text-xs font-medium rounded-xl p-3 bg-canvas border border-rim focus:border-sienna outline-none text-alabaster placeholder:text-smoke/50 transition-colors resize-none"
+                  rows={3}
+                  className="w-full text-xs sm:text-sm font-medium rounded-xl p-3.5 border outline-none transition-colors resize-none shadow-sm focus:border-sienna"
+                  style={{
+                    backgroundColor: 'var(--color-canvas)',
+                    color: 'var(--color-alabaster)',
+                    borderColor: 'var(--color-rim)',
+                  }}
                 />
               </div>
 
@@ -333,11 +366,13 @@ export function QuestionEditorModal({
                     return (
                       <div
                         key={oIdx}
-                        className={`flex items-center gap-2.5 p-2 rounded-xl border transition-all ${
-                          isCorrect
-                            ? 'bg-emerald-500/10 border-emerald-500/40 shadow-sm'
-                            : 'bg-canvas border-rim/80 hover:border-rim'
-                        }`}
+                        className="flex items-center gap-2.5 p-2 rounded-xl border transition-all shadow-sm"
+                        style={{
+                          backgroundColor: isCorrect
+                            ? 'color-mix(in srgb, #10B981 12%, var(--color-canvas))'
+                            : 'var(--color-canvas)',
+                          borderColor: isCorrect ? '#10B981' : 'var(--color-rim)',
+                        }}
                       >
                         {/* Shape / Label Tag */}
                         <div
@@ -354,24 +389,25 @@ export function QuestionEditorModal({
                           value={opt}
                           onChange={e => handleOptionChange(activeIdx, oIdx, e.target.value)}
                           placeholder={`Option ${shape.label}...`}
-                          className="flex-1 bg-transparent text-xs text-alabaster outline-none placeholder:text-smoke/40"
+                          className="flex-1 bg-transparent text-xs sm:text-sm font-medium outline-none"
+                          style={{ color: 'var(--color-alabaster)' }}
                         />
 
                         {/* Correct Answer Toggle Button */}
                         <button
                           type="button"
                           onClick={() => handleSetCorrectIndex(activeIdx, oIdx)}
-                          className={`flex items-center gap-1 py-1 px-2 rounded-md text-[11px] font-bold transition-all flex-shrink-0 ${
+                          className={`flex items-center gap-1 py-1 px-2.5 rounded-md text-[11px] font-bold transition-all flex-shrink-0 cursor-pointer ${
                             isCorrect
-                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                              : 'text-smoke hover:text-emerald-300 hover:bg-emerald-500/10'
+                              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-sm'
+                              : 'text-smoke hover:text-emerald-400 hover:bg-emerald-500/10'
                           }`}
                           aria-label={`Mark option ${shape.label} as correct`}
                           aria-pressed={isCorrect}
                         >
                           {isCorrect ? (
                             <>
-                              <Check className="w-3.5 h-3.5 text-emerald-400" />
+                              <Check className="w-3.5 h-3.5 text-emerald-400 stroke-[2.5]" />
                               <span>Correct</span>
                             </>
                           ) : (
@@ -396,7 +432,12 @@ export function QuestionEditorModal({
                   onChange={e => handleExplanationChange(activeIdx, e.target.value)}
                   placeholder="Explain why the correct answer is right and clarify common student misconceptions..."
                   rows={2}
-                  className="w-full text-xs font-normal rounded-xl p-3 bg-canvas border border-rim focus:border-sienna outline-none text-alabaster placeholder:text-smoke/50 transition-colors resize-none"
+                  className="w-full text-xs font-normal rounded-xl p-3 border outline-none transition-colors resize-none shadow-sm focus:border-sienna"
+                  style={{
+                    backgroundColor: 'var(--color-canvas)',
+                    color: 'var(--color-alabaster)',
+                    borderColor: 'var(--color-rim)',
+                  }}
                 />
               </div>
             </>
@@ -407,7 +448,10 @@ export function QuestionEditorModal({
       </div>
 
       {/* ── Footer ─────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between px-6 py-4 border-t border-rim bg-card/60 flex-shrink-0">
+      <div
+        className="flex items-center justify-between px-6 py-4 border-t border-rim flex-shrink-0"
+        style={{ backgroundColor: 'var(--color-elevated)' }}
+      >
         <div className="text-xs text-smoke">
           {questions.length} {questions.length === 1 ? 'question' : 'questions'} ready
         </div>
@@ -438,7 +482,10 @@ export function QuestionEditorModal({
 
   if (isEmbedded) {
     return (
-      <div className="card rounded-2xl border border-rim shadow-2xl overflow-hidden">
+      <div
+        className="card rounded-2xl border border-rim shadow-2xl overflow-hidden"
+        style={{ backgroundColor: 'var(--color-elevated)' }}
+      >
         {content}
       </div>
     );
@@ -450,7 +497,7 @@ export function QuestionEditorModal({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5"
-      style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)' }}
+      style={{ backgroundColor: 'rgba(0, 0, 0, 0.85)', backdropFilter: 'blur(10px)' }}
       onClick={e => e.target === e.currentTarget && onClose()}
     >
       <motion.div
@@ -461,7 +508,8 @@ export function QuestionEditorModal({
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 15 }}
         transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-        className="w-full max-w-4xl rounded-2xl bg-card border border-rim/90 shadow-2xl overflow-hidden"
+        className="w-full max-w-4xl rounded-2xl border border-rim shadow-2xl overflow-hidden"
+        style={{ backgroundColor: 'var(--color-elevated)' }}
       >
         {content}
       </motion.div>
