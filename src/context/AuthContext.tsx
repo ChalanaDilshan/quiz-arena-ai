@@ -18,6 +18,7 @@ import { auth, googleProvider } from '../firebase';
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
+  error: string | null;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -53,15 +54,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return unsubscribe;
   }, []);
 
+  const [authError, setAuthError] = useState<string | null>(null);
+
   const signInWithGoogle = async () => {
+    setAuthError(null);
     if (!auth || !googleProvider) {
-      console.warn('Google sign-in is not configured: missing Firebase API key');
+      const msg = 'Google sign-in is not configured: missing Firebase API key. Please verify root .env has VITE_FIREBASE_* variables and rebuild the frontend container.';
+      console.warn(msg);
+      setAuthError(msg);
+      alert(msg);
       return;
     }
     try {
       await signInWithPopup(auth, googleProvider);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Google sign-in failed:', err);
+      const code = err?.code || '';
+      let userMsg = err?.message || 'Google sign-in failed.';
+
+      if (code === 'auth/unauthorized-domain') {
+        const host = typeof window !== 'undefined' ? window.location.hostname : 'your server';
+        userMsg = `Firebase Auth Error: Domain/IP "${host}" is not authorized.\n\nFix: Go to Firebase Console > Authentication > Settings > Authorized domains and add "${host}".`;
+      } else if (code === 'auth/popup-blocked') {
+        userMsg = 'Google Sign-In popup was blocked by your browser. Please allow popups for this site.';
+      } else if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+        return; // User intentionally closed popup, no error needed
+      }
+
+      setAuthError(userMsg);
+      alert(userMsg);
     }
   };
 
@@ -75,7 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, signInWithGoogle, signOut }}>
+    <AuthContext.Provider value={{ user, loading, error: authError, signInWithGoogle, signOut }}>
       {children}
     </AuthContext.Provider>
   );
