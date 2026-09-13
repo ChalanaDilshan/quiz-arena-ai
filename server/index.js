@@ -604,6 +604,41 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on('updateQuizQuestions', ({ pin, hostToken, questions }) => {
+    const cleanPin = String(pin || socket.roomPin || '').trim();
+    const room = rooms.get(cleanPin);
+    if (!room || !isHostAuthorized(room, socket, hostToken, cleanPin)) {
+      socket.emit('error', 'Unauthorized to update room questions.');
+      return;
+    }
+    if (room.state !== 'LOBBY') {
+      socket.emit('error', 'Questions can only be modified while in the lobby.');
+      return;
+    }
+    if (!Array.isArray(questions) || questions.length === 0 || questions.length > 100) {
+      socket.emit('error', 'Invalid questions array (1-100 questions required).');
+      return;
+    }
+    const isValid = questions.every(q =>
+      q && typeof q.text === 'string' && q.text.length <= 500 &&
+      Array.isArray(q.options) && q.options.length >= 2 && q.options.length <= 6 &&
+      typeof q.correctIndex === 'number' && q.correctIndex >= 0 && q.correctIndex < q.options.length &&
+      (!q.explanation || typeof q.explanation === 'string')
+    );
+    if (!isValid) {
+      socket.emit('error', 'Invalid question format in updated questions.');
+      return;
+    }
+
+    room.questions = questions.map(q => ({
+      ...q,
+      id: q.id || crypto.randomUUID(),
+      timeLimit: q.timeLimit || 20,
+    }));
+    io.to(cleanPin).emit('questionsUpdated', { questions: room.questions });
+    broadcastState(cleanPin);
+  });
+
   socket.on('disconnect', () => {
     // Cleanup zombie rooms to prevent memory leaks if host disconnects
     for (const [pin, room] of rooms.entries()) {

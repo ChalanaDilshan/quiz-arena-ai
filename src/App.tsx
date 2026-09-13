@@ -127,13 +127,17 @@ function App() {
             initialPin={initialPin}
             isJoining={game.isJoining}
             onJoinGame={game.joinGame}
-            onHostGame={(file, numQ, diff, extractedText) => {
+            onHostGame={(file, numQ, diff, extractedText, onReview) => {
               setHostFileName(file.name);
-              game.hostGame(file, numQ, diff, extractedText);
+              game.hostGame(file, numQ, diff, extractedText, onReview);
             }}
             onHostSavedQuiz={(quiz) => {
               setHostFileName(quiz.topic);
               game.hostSavedQuiz(quiz);
+            }}
+            onHostWithQuestions={(questions, topic) => {
+              setHostFileName(topic || 'Custom Quiz');
+              game.hostWithQuestions(questions, topic);
             }}
             uploadProgress={game.uploadProgress}
             error={game.error}
@@ -147,6 +151,8 @@ function App() {
             players={game.players}
             isHost={game.isHost}
             currentUserId={game.playerId}
+            questions={game.session?.questions || []}
+            onUpdateQuestions={game.updateSessionQuestions}
             onStartGame={game.startGame}
             onKickPlayer={game.kickPlayer}
             onEditNickname={game.editNickname}

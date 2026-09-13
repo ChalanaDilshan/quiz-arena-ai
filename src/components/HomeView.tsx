@@ -9,15 +9,18 @@ import { getSavedQuizzes, type SavedQuiz } from '../utils/quizHistory';
 import { extractTextFromPdf } from '../utils/pdfExtractor';
 import { LegalModal, type LegalTab } from './LegalModal';
 import { QuizArenaLogo } from './QuizArenaLogo';
+import type { Question } from '../types';
+import { QuestionEditorModal } from './QuestionEditorModal';
 
 interface HomeViewProps {
   onJoinGame: (pin: string, nickname: string) => void;
-  onHostGame: (file: File, numQuestions: number, difficulty: string, extractedText?: string) => void;
+  onHostGame: (file: File, numQuestions: number, difficulty: string, extractedText?: string, onReview?: (data: { topic: string; questions: Question[] }) => void) => void;
   uploadProgress: number;
   error: string | null;
   initialTab?: 'join' | 'host';
   initialPin?: string;
   onHostSavedQuiz?: (quiz: SavedQuiz) => void;
+  onHostWithQuestions?: (questions: Question[], topic?: string) => void;
   onBack?: () => void;
   isJoining?: boolean;
 }
@@ -36,6 +39,7 @@ export function HomeView({
   onJoinGame,
   onHostGame,
   onHostSavedQuiz,
+  onHostWithQuestions,
   uploadProgress,
   error,
   initialTab = 'join',
@@ -44,6 +48,9 @@ export function HomeView({
   isJoining = false,
 }: HomeViewProps) {
   const [activeTab, setActiveTab] = useState<'join' | 'host'>(initialTab);
+  const [reviewBeforeLaunch, setReviewBeforeLaunch] = useState(false);
+  const [reviewQuizData, setReviewQuizData] = useState<{ topic: string; questions: Question[] } | null>(null);
+  const [showReviewModal, setShowReviewModal] = useState(false);
   const [pin, setPin] = useState<string[]>(() => {
     if (initialPin && initialPin.length === 6) {
       return initialPin.split('');
@@ -641,10 +648,35 @@ export function HomeView({
                     </motion.div>
                   )}
 
-                  <button onClick={() => selectedFile && onHostGame(selectedFile, numQuestions, difficulty, extractedText)}
+                  {/* Review questions checkbox */}
+                  <label className="flex items-center gap-2 mb-4 cursor-pointer select-none group">
+                    <input
+                      type="checkbox"
+                      checked={reviewBeforeLaunch}
+                      onChange={(e) => setReviewBeforeLaunch(e.target.checked)}
+                      className="w-4 h-4 rounded text-sienna bg-canvas border-rim focus:ring-sienna/40 focus:ring-offset-0 cursor-pointer accent-[#D15836]"
+                    />
+                    <span className="text-xs text-smoke group-hover:text-alabaster transition-colors">
+                      Review & edit questions before entering lobby
+                    </span>
+                  </label>
+
+                  <button
+                    onClick={() => {
+                      if (!selectedFile) return;
+                      if (reviewBeforeLaunch && onHostWithQuestions) {
+                        onHostGame(selectedFile, numQuestions, difficulty, extractedText, (data) => {
+                          setReviewQuizData(data);
+                          setShowReviewModal(true);
+                        });
+                      } else {
+                        onHostGame(selectedFile, numQuestions, difficulty, extractedText);
+                      }
+                    }}
                     disabled={!selectedFile || isExtracting || (uploadProgress > 0 && uploadProgress < 100)}
-                    className="btn-primary w-full">
-                    <Sparkles className="w-4 h-4" /> Generate {numQuestions} Questions
+                    className="btn-primary w-full"
+                  >
+                    <Sparkles className="w-4 h-4" /> {reviewBeforeLaunch ? 'Generate & Review Questions' : `Generate ${numQuestions} Questions`}
                   </button>
                   </motion.div>
                 )}
@@ -683,6 +715,20 @@ export function HomeView({
           onClose={() => setLegalModalOpen(false)}
           initialTab={legalTab}
         />
+
+        {/* ── Pre-launch Question Review Modal ──────────────────────── */}
+        {showReviewModal && reviewQuizData && onHostWithQuestions && (
+          <QuestionEditorModal
+            isOpen={showReviewModal}
+            questions={reviewQuizData.questions}
+            title={`Review & Edit: ${reviewQuizData.topic}`}
+            onSave={(updated) => {
+              setShowReviewModal(false);
+              onHostWithQuestions(updated, reviewQuizData.topic);
+            }}
+            onClose={() => setShowReviewModal(false)}
+          />
+        )}
       </motion.div>
     </div>
   );

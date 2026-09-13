@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Copy, Users, Play, Loader2, Check, QrCode, Link as LinkIcon, Sparkles, X, Edit2, Shield, ArrowLeft } from 'lucide-react';
+import { Copy, Users, Play, Loader2, Check, QrCode, Link as LinkIcon, Sparkles, X, Edit2, Shield, ArrowLeft, BookOpen } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
-import type { Player } from '../types';
+import type { Player, Question } from '../types';
+import { QuestionEditorModal } from './QuestionEditorModal';
 
 interface LobbyViewProps {
   roomPin: string;
@@ -13,12 +14,15 @@ interface LobbyViewProps {
   onKickPlayer?: (playerId: string) => void;
   onEditNickname?: (newNickname: string) => void;
   onLeave?: () => void;
+  questions?: Question[];
+  onUpdateQuestions?: (questions: Question[]) => void;
 }
 
-export function LobbyView({ roomPin, players, isHost, currentUserId, onStartGame, onKickPlayer, onEditNickname, onLeave }: LobbyViewProps) {
+export function LobbyView({ roomPin, players, isHost, currentUserId, onStartGame, onKickPlayer, onEditNickname, onLeave, questions, onUpdateQuestions }: LobbyViewProps) {
   const [copiedPin, setCopiedPin] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [showQrModal, setShowQrModal] = useState(false);
+  const [showReviewModal, setShowReviewModal] = useState(false);
   const [editingNickname, setEditingNickname] = useState(false);
   const [tempNickname, setTempNickname] = useState('');
 
@@ -311,17 +315,33 @@ export function LobbyView({ roomPin, players, isHost, currentUserId, onStartGame
             </div>
 
             {isHost ? (
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.97 }}
-                onClick={onStartGame}
-                disabled={players.length < 2}
-                aria-label={`Start match with ${players.length} players`}
-                className="btn-primary !px-8 !py-3 w-full sm:w-auto flex items-center justify-center gap-2 shadow-lg shadow-sienna/25"
-              >
-                <Play className="w-4 h-4 fill-current" />
-                <span>Start Match ({players.length})</span>
-              </motion.button>
+              <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full sm:w-auto">
+                {questions && questions.length > 0 && onUpdateQuestions && (
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => setShowReviewModal(true)}
+                    type="button"
+                    aria-label="Review and edit quiz questions"
+                    className="btn-ghost !px-4 !py-3 w-full sm:w-auto flex items-center justify-center gap-2 border border-rim hover:border-sienna text-alabaster font-semibold text-xs transition-colors"
+                  >
+                    <BookOpen className="w-4 h-4 text-sienna" />
+                    <span>Review Questions ({questions.length})</span>
+                  </motion.button>
+                )}
+
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={onStartGame}
+                  disabled={players.length < 2}
+                  aria-label={`Start match with ${players.length} players`}
+                  className="btn-primary !px-8 !py-3 w-full sm:w-auto flex items-center justify-center gap-2 shadow-lg shadow-sienna/25"
+                >
+                  <Play className="w-4 h-4 fill-current" />
+                  <span>Start Match ({players.length})</span>
+                </motion.button>
+              </div>
             ) : (
               <div className="flex items-center justify-center gap-2.5 text-xs font-semibold text-smoke">
                 <Loader2 className="w-4 h-4 animate-spin text-sienna" />
@@ -392,6 +412,19 @@ export function LobbyView({ roomPin, players, isHost, currentUserId, onStartGame
           </div>
         )}
       </AnimatePresence>
+      {/* ── Question Review & Manual Editing Modal (Host Only) ─────────── */}
+      {isHost && showReviewModal && questions && onUpdateQuestions && (
+        <QuestionEditorModal
+          isOpen={showReviewModal}
+          questions={questions}
+          title="Review & Edit Lobby Questions"
+          onSave={(updated) => {
+            onUpdateQuestions(updated);
+            setShowReviewModal(false);
+          }}
+          onClose={() => setShowReviewModal(false)}
+        />
+      )}
     </div>
   );
 }

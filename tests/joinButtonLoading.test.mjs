@@ -36,6 +36,10 @@ tsxSource = tsxSource.replace(
   /import \{ QuizArenaLogo \} from '\.\/QuizArenaLogo';/,
   `const QuizArenaLogo = (props) => React.createElement('svg', props);`
 );
+tsxSource = tsxSource.replace(
+  /import \{ QuestionEditorModal \} from '\.\/QuestionEditorModal';/,
+  `const QuestionEditorModal = () => null;`
+);
 
 const { outputText } = ts.transpileModule(tsxSource, {
   compilerOptions: {

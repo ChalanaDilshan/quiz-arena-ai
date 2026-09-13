@@ -5,7 +5,7 @@ import {
   Target, Trash2, ChevronRight, Calendar, BookOpen,
   TrendingUp, AlertTriangle, CheckCircle2, Download,
   FileSpreadsheet, X, Award, Bot, Search, ArrowUpDown,
-  MoreVertical, ChevronDown, ChevronUp, Play, AlertCircle, RotateCcw,
+  MoreVertical, ChevronDown, ChevronUp, Play, AlertCircle, RotateCcw, Edit3,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -18,6 +18,7 @@ import type { Player, Question } from '../types';
 import { LegalModal, type LegalTab } from './LegalModal';
 import { QuizArenaLogo } from './QuizArenaLogo';
 import { getApiUrl } from '../utils/apiConfig';
+import { QuestionEditorModal } from './QuestionEditorModal';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -628,6 +629,7 @@ export function AdminDashboard({ onBack, onRehost }: AdminDashboardProps) {
   const [isPendingFallback, setIsPendingFallback] = useState(false);
   const [pendingTopic, setPendingTopic] = useState('CS 101: Curriculum Topic');
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [isEditingPendingQuiz, setIsEditingPendingQuiz] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
   const [isTriggering, setIsTriggering] = useState(false);
   const [legalModalOpen, setLegalModalOpen] = useState(false);
@@ -1056,6 +1058,14 @@ export function AdminDashboard({ onBack, onRehost }: AdminDashboardProps) {
                                 {isApproving ? 'Saving...' : 'Approve Fallback Draft'}
                               </button>
                               <button
+                                type="button"
+                                onClick={() => setIsEditingPendingQuiz(true)}
+                                className="btn-ghost text-xs !py-2 !px-3.5 flex items-center gap-1.5 border border-amber-500/40 text-amber-300 hover:bg-amber-500/10 transition-colors"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                                <span>Edit Questions</span>
+                              </button>
+                              <button
                                 onClick={handleDismissQuiz}
                                 className="btn-ghost text-xs !py-2 !px-4 text-smoke hover:text-alabaster"
                               >
@@ -1136,6 +1146,14 @@ export function AdminDashboard({ onBack, onRehost }: AdminDashboardProps) {
                               >
                                 <CheckCircle2 className="w-4 h-4" />
                                 {isApproving ? 'Saving...' : 'Review & Publish'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setIsEditingPendingQuiz(true)}
+                                className="btn-ghost text-xs !py-2 !px-3.5 flex items-center gap-1.5 border border-indigo-500/40 text-indigo-300 hover:bg-indigo-500/10 transition-colors"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                                <span>Edit Questions</span>
                               </button>
                               <button
                                 onClick={handleDismissQuiz}
@@ -1337,6 +1355,20 @@ export function AdminDashboard({ onBack, onRehost }: AdminDashboardProps) {
           onClose={() => setLegalModalOpen(false)}
           initialTab={legalTab}
         />
+
+        {/* ── Pending Quiz Editor Modal ────────────────────────────── */}
+        {isEditingPendingQuiz && pendingQuiz && (
+          <QuestionEditorModal
+            isOpen={isEditingPendingQuiz}
+            questions={pendingQuiz}
+            title={`Edit Syllabus Draft: ${pendingTopic}`}
+            onSave={(updated) => {
+              setPendingQuiz(updated);
+              setIsEditingPendingQuiz(false);
+            }}
+            onClose={() => setIsEditingPendingQuiz(false)}
+          />
+        )}
       </div>
     </div>
   );

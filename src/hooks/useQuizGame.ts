@@ -107,8 +107,10 @@ export interface UseQuizGameReturn {
 
   // Actions
   joinGame: (pin: string, nickname: string) => void;
-  hostGame: (file: File, numQuestions: number, difficulty: string, extractedText?: string) => void;
+  hostGame: (file: File, numQuestions: number, difficulty: string, extractedText?: string, onReview?: (data: { topic: string; questions: Question[] }) => void) => void;
   hostSavedQuiz: (quiz: { topic: string; questions: Question[] }) => void;
+  hostWithQuestions: (questions: Question[], topic?: string) => void;
+  updateSessionQuestions: (questions: Question[]) => void;
   startGame: () => void;
   submitAnswer: (answerIndex: number) => void;
   nextQuestion: () => void;
@@ -417,6 +419,10 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
       }
     });
 
+    socket.on('questionsUpdated', ({ questions: updatedQs }: { questions: Question[] }) => {
+      setSession(prev => prev ? { ...prev, questions: updatedQs, totalQuestions: updatedQs.length } : null);
+    });
+
     socket.on('error', (msg) => {
       updateIsJoining(false);
       setError(msg);
@@ -526,7 +532,7 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
   );
 
   const hostGame = useCallback(
-    async (_file: File, numQuestions: number, difficulty: string, extractedText?: string) => {
+    async (_file: File, numQuestions: number, difficulty: string, extractedText?: string, onReview?: (data: { topic: string; questions: Question[] }) => void) => {
       setError(null);
 
       if (useMockMode) {
@@ -546,6 +552,12 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
           if (progress >= 100) {
             progress = 100;
             clearInterval(interval);
+
+            if (onReview) {
+              setUploadProgress(100);
+              onReview({ topic: _file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' '), questions });
+              return;
+            }
 
             const pin = generatePin();
             const host: Player = {
@@ -653,6 +665,15 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
         }
       };
 
+      const handleResult = (data: { topic?: string; questions: Question[]; isFallback?: boolean }) => {
+        if (onReview) {
+          setUploadProgress(100);
+          onReview({ topic: data.topic || topicName, questions: data.questions });
+        } else {
+          launchGame(data);
+        }
+      };
+
       const generateStreaming = async () => {
         try {
           const res = await fetch(`${url}/api/generate-quiz/stream`, {
@@ -693,7 +714,7 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
                   }
                   if (payload.stage === 'COMPLETE' && payload.result) {
                     quizCompleted = true;
-                    launchGame(payload.result);
+                    handleResult(payload.result);
                   }
                 } catch (e) {
                   console.warn('[useQuizGame] Parse chunk notice:', e);
@@ -719,7 +740,7 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
           });
           if (!fallbackRes.ok) throw new Error('Generation failed');
           const data = await fallbackRes.json();
-          launchGame(data);
+          handleResult(data);
         }
       };
 
@@ -814,6 +835,40 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
       }
     },
     [playerId, buildMockPlayers, useMockMode, setupSocketListeners, saveHostSession, startConnectionTimers, clearConnectionTimers],
+  );
+
+  const hostWithQuestions = useCallback(
+    (questions: Question[], topic: string = 'Custom Quiz') => {
+      hostSavedQuiz({ topic, questions });
+    },
+    [hostSavedQuiz],
+  );
+
+  const updateSessionQuestions = useCallback(
+    (newQuestions: Question[]) => {
+      setSession(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          questions: newQuestions,
+          totalQuestions: newQuestions.length,
+        };
+      });
+
+      if (!useMockMode && socketRef.current) {
+        const stored = getStoredHostSession();
+        const pin = session?.roomPin || stored?.pin;
+        const hostToken = hostTokenRef.current || stored?.hostToken;
+        if (pin && hostToken) {
+          socketRef.current.emit('updateQuizQuestions', {
+            pin,
+            hostToken,
+            questions: newQuestions,
+          });
+        }
+      }
+    },
+    [useMockMode, session?.roomPin, getStoredHostSession],
   );
 
   const startGame = useCallback(() => {
@@ -1079,6 +1134,8 @@ export function useQuizGame(useMockMode = true): UseQuizGameReturn {
     joinGame,
     hostGame,
     hostSavedQuiz,
+    hostWithQuestions,
+    updateSessionQuestions,
     startGame,
     submitAnswer,
     nextQuestion,
