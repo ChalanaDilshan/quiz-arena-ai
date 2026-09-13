@@ -51,13 +51,12 @@ for _env_candidate in [
 AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
 BEDROCK_MODEL_ID = os.environ.get(
     "BEDROCK_MODEL_ID",
-    "anthropic.claude-3-5-sonnet-20241022-v2:0"
+    "amazon.nova-lite-v1:0"
 )
 # Fast/cheap model for low-creativity, short-output agents (Hint Master, etc.)
-# Claude Haiku is ~5x cheaper and ~3x faster than Sonnet for simple tasks.
 BEDROCK_FAST_MODEL_ID = os.environ.get(
     "BEDROCK_FAST_MODEL_ID",
-    "anthropic.claude-3-haiku-20240307-v1:0"
+    "amazon.nova-micro-v1:0"
 )
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
