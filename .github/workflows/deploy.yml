@@ -92,9 +92,20 @@ jobs:
             echo "=== [1/4] Pulling latest code ==="
             git pull origin main
 
-            echo "=== [2/4] Writing production environment files ==="
-            printf '%s' "$PROD_ROOT_ENV" > .env
-            printf '%s' "$PROD_BACKEND_ENV" > server/.env
+            echo "=== [2/4] Updating production environment files ==="
+            if [ -n "$PROD_ROOT_ENV" ]; then
+              echo "Writing .env from GitHub secret PROD_ROOT_ENV..."
+              printf '%s\n' "$PROD_ROOT_ENV" > .env
+            else
+              echo "Notice: PROD_ROOT_ENV secret is empty; keeping existing server .env."
+            fi
+
+            if [ -n "$PROD_BACKEND_ENV" ]; then
+              echo "Writing server/.env from GitHub secret PROD_BACKEND_ENV..."
+              printf '%s\n' "$PROD_BACKEND_ENV" > server/.env
+            else
+              echo "Notice: PROD_BACKEND_ENV secret is empty; keeping existing server/server.env."
+            fi
 
             echo "=== [3/4] Rebuilding and restarting Docker containers ==="
             docker compose up -d --build --remove-orphans
